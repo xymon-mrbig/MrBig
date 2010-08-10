@@ -1,4 +1,55 @@
 
+051111	Terminate each report with \n\0 rather than \n. This is
+	what Quest's client does.
+
+051025	Always sleep at least SLEEP_MIN seconds between loops.
+
+
+050712	Added buffer overrun detection to big_malloc et al.
+
+050708	Handle unexpected time changes rationally. Released 0.8.1.
+
+050707	mrbig.c: new function insert_status keeps track of changes
+	in test status so that the main loop can be run more often
+	without sending more reports to the bbdisplay.
+	Added shutdown() call to mrsend, as suggested by msdn.
+	New variable mrloop regulates how often the main loop runs.
+	New configuration option controls mrloop.
+	Released 0.8.0.
+
+050705	readlog.c: handle the case that RegQueryValueEx may not
+	null-terminate the result.
+
+050615	Modified the event log code for w2003.
+
+050530	cfg.c, mrbig.c: Removed bind directive under [mrbig] and added
+	global directive .bind instead. Tankevurpa.
+
+	Released 0.7.1.
+
+050530	msgs.c: New directive filters on event id.
+	Example: ignore id 1000
+
+	cfg.c, mrbig.c: New directive to bind local address (useful
+	when there are more than one interfaces).  This goes under
+	the [mrbig] section in mrbig.cfg, before any .configure lines.
+	Example: bind 10.0.35.20
+
+	Released 0.7.0.
+
+050510	Added lots of debugging output.
+
+050227	Introduced strlcat.c and strlcpy.c from OpenBSD.
+
+050224	Let mrlog print to stderr if running standalone.
+
+050201	cpu.c: New formula to calculate memory usage.
+	Release 0.5.0.
+
+050131	cpu.c: New version of pscount() which doesn't require
+	W2K registry.
+	Check each read_perfcounters() call for NULL results.
+
 050130	Rewrote procs.c so the same code can run on NT4 and W2K. This
 	requires psapi.dll, which is a free download on NT4.
 	Added Windows version and MrBig version to cpu status message.

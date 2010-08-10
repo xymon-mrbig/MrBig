@@ -80,6 +80,8 @@ void ext_tests(void)
 	DWORD n;
 	int i;
 
+	if (debug > 1) mrlog("ext_tests()");
+
 	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "ext.cfg");
 	read_cfg("ext", cfgfile);
 
@@ -87,6 +89,7 @@ void ext_tests(void)
 		p = strchr(cmd, '\n');
 		if (p) *p = '\0';
 		if (cmd[0] == '#' || cmd[0] == '\0') continue;
+		if (debug) mrlog("Ext test: %s", cmd);
 		ZeroMemory(&si, sizeof si);
 		ZeroMemory(&pi, sizeof pi);
 		if (CreateProcess(NULL, cmd, NULL, NULL, FALSE,
@@ -108,12 +111,3 @@ void ext_tests(void)
 	pickup();
 }
 
-#ifdef DEBUGGING
-int main(void)
-{
-	strncpy(cfgdir, sizeof cfgdir,
-		"C:\\Documents and Settings\\Ulric\\MrBig");
-	ext_tests();
-	return 0;
-}
-#endif

@@ -127,7 +127,7 @@ int service_main(int argc, char **argv)
 VOID SvcDebugOut(LPSTR String, DWORD Status) 
 { 
    char fn[256];
-   strncpy(fn, "C:\\service.out", sizeof fn);
+   strlcpy(fn, "C:\\service.out", sizeof fn);
    FILE *fp = fopen(fn, "a");
    if (!fp) return;
    fprintf(fp, "%s (%ld)\n", String, (long)Status);

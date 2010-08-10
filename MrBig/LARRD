@@ -8,7 +8,7 @@ $17}' |$SED 's/%//g' | $SED 's/(//' |$SED 's/)//' |$SED 's/MB/ /' |$AWK
 
 När det här hade räckt:
 
-VALUE=`$HEAD -1 $log|sed -e 's/^.*(//' -e 's/).*$//'`
+VALUE=`$HEAD -1 $log|sed -e 's/^.*(//' -e 's/%).*$//'`
 
 Dvs inte mindre än nio processer istället för en, och dessutom det
 bräckligaste beroende av format jag skådat.

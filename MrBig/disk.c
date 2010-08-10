@@ -12,7 +12,7 @@ E              1249888     4458  1245430     0%    /FIXED/E ()
 
 struct cfg {
 	char *name;
-	int yellow, red;
+	double yellow, red;
 	struct cfg *next;
 } *pcfg;
 
@@ -20,12 +20,13 @@ static void read_diskcfg(/*char *p*/)
 {
 	struct cfg *pc;
 	char b[100], name[100];
-	int y, r, n, i;
+	int n, i;
+	double y, r;
 
 	pcfg = NULL;
 	for (i = 0; get_cfg("disk", b, sizeof b, i); i++) {
 		if (b[0] == '#') continue;
-		n = sscanf(b, "%s %d %d", name, &y, &r);
+		n = sscanf(b, "%s %lf %lf", name, &y, &r);
 		if (n != 3) continue;
 		pc = big_malloc("read_diskcfg (node)", sizeof *pc);
 		pc->name = big_strdup("read_diskcfg (name)", name);
@@ -43,12 +44,12 @@ static void free_cfg(void)
 	while (pcfg) {
 		dl = pcfg;
 		pcfg = dl->next;
-		free(dl->name);
-		free(dl);
+		big_free("free_cfg (name)", dl->name);
+		big_free("free_cfg (node)", dl);
 	}
 }
 
-static void lookup_limits(char *drive, int *yellow, int *red)
+static void lookup_limits(char *drive, double *yellow, double *red)
 {
 	struct cfg *pc;
 
@@ -65,14 +66,17 @@ static void lookup_limits(char *drive, int *yellow, int *red)
 
 void disk(char *b, int n)
 {
-	int i, j, yellow, red;
+	int i, j;
+	double yellow, red;
 	char d[10], p[100], q[5000], r[5000], *color = "green";
 	char cfgfile[1024], drive[10];
 	DWORD drives = GetLogicalDrives();
-	unsigned int dtype, pct;
+	unsigned int dtype;
+	double pct;
 	unsigned long long total_bytes, free_bytes;
-	ULARGE_INTEGER tb, fb;
+	ULARGE_INTEGER fa, tb, fb;
 
+	if (debug > 1) mrlog("disk(%p, %d)", b, n);
 	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "disk.cfg");
 	read_cfg("disk", cfgfile);
 	read_diskcfg(/*cfgfile*/);
@@ -87,37 +91,37 @@ void disk(char *b, int n)
 			snprintf(d, sizeof d, "%c:\\", i);
 			dtype = GetDriveType(d);
 			if (dtype == DRIVE_FIXED) {
-				if (!GetDiskFreeSpaceEx(d, NULL, &tb, &fb)) {
+				if (!GetDiskFreeSpaceEx(d, &fa, &tb, &fb)) {
 					total_bytes = free_bytes = 0;
 					pct = 0;
 				} else {
 					total_bytes = tb.QuadPart;
 					free_bytes = fb.QuadPart;
-					pct = 100-100*free_bytes/total_bytes;
+					pct = 100.0-100.0*free_bytes/total_bytes;
 				}
 				lookup_limits(drive, &yellow, &red);
 				if (pct >= red) {
 					snprcat(r, sizeof r,
-						"&red %s (%d%%) has reached the PANIC level (%d%%)\n",
+						"&red %s (%.1f%%) has reached the PANIC level (%.1f%%)\n",
 						d, pct, red);
 					color = "red";
 				} else if (!strcmp(color, "green")
 					 && pct >= yellow) {
 					snprcat(r, sizeof r,
-						"&yellow %s (%d%%) has reached the WARNING level (%d%%)\n",
+						"&yellow %s (%.1f%%) has reached the WARNING level (%.1f%%)\n",
 						d, pct, yellow);
 					color = "yellow";
 				}
 				j = 0;
 				/* Filesystem */
 				snprintf(p, sizeof p,
-					"%-10c %11lu %11lu %11lu %5d%%   /FIXED/%c\n",
+					"%-10c %11lu %11lu %11lu %5.1f%%   /FIXED/%c\n",
 					i,
 					(unsigned long) (total_bytes / 1024),
 					(unsigned long) ((total_bytes - free_bytes) / 1024),
 					(unsigned long) (free_bytes / 1024),
 					pct, i);
-				strncat(q, p, sizeof q);
+				strlcat(q, p, sizeof q);
 			}
 		}
 		drives >>= 1;

@@ -8,11 +8,7 @@ static char **get_args(EVENTLOGRECORD *pBuf)
 
 	if (pBuf->NumStrings == 0) return NULL;
 
-#if 0
-	args = GlobalAlloc(GMEM_FIXED, sizeof(char *) * pBuf->NumStrings);
-#else
 	args = big_malloc("get_args", sizeof(char *) * pBuf->NumStrings);
-#endif
 	cp = (char *)pBuf + (pBuf->StringOffset);
 
 	for (arg_count=0; arg_count<pBuf->NumStrings; arg_count++) {
@@ -28,7 +24,7 @@ static BOOL get_module_from_source(char *log,
 {
 	DWORD lResult;
 	DWORD module_name_size;
-	char module_name[1000];
+	char module_name[1024];
 	HKEY hAppKey = NULL;
 	HKEY hSourceKey = NULL;
 	BOOL bReturn = FALSE;
@@ -40,24 +36,33 @@ static BOOL get_module_from_source(char *log,
 	lResult = RegOpenKeyEx(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hAppKey);
 
 	if (lResult != ERROR_SUCCESS) {
-		printf("registry can not open.\n");
+		if (debug) mrlog("get_module_from_source: registry can not open.");
 		goto Exit;
 	}
 
 	lResult = RegOpenKeyEx(hAppKey, source_name, 0, KEY_READ, &hSourceKey);
 
-	if (lResult != ERROR_SUCCESS) goto Exit;
+	if (lResult != ERROR_SUCCESS) {
+		if (debug) mrlog("get_module_from_source: can't RegOpenKeyEx");
+		goto Exit;
+	}
 
-	module_name_size = 1000;
+	module_name_size = sizeof module_name - 1;
 
 	lResult = RegQueryValueEx(hSourceKey, "EventMessageFile",
 		NULL, NULL, module_name, &module_name_size);
 
-	if (lResult != ERROR_SUCCESS) goto Exit;
+	if (lResult != ERROR_SUCCESS) {
+		if (debug) mrlog("get_module_from_source: can't RegQueryValueEx");
+		goto Exit;
+	}
 
-	ExpandEnvironmentStrings(module_name, expanded_name, 1000);
+	/* RegQueryValueEx doesn't necessarily null-terminate */
+	module_name[sizeof module_name - 1] = '\0';
 
-	bReturn = TRUE;
+	ExpandEnvironmentStrings(module_name, expanded_name, sizeof module_name - 1);
+
+	bReturn = ERROR_SUCCESS;
 
 Exit:
 	if (hSourceKey != NULL) RegCloseKey(hSourceKey);
@@ -76,9 +81,18 @@ static BOOL disp_message(char *log, char *source_name, char *entry_name,
 	char source_module_name[1000];
 	char *pMessage = NULL;
 
+//printf("About to call get_module_from_source(%s, %s, %s, %p)\n",
+//log, source_name, entry_name, source_module_name);
+
 	bResult = get_module_from_source(log,
 			source_name, entry_name, source_module_name);
-	if (!bResult) goto Exit;
+
+//printf("get_module_from_source returns %d\n", bResult);
+
+	if (bResult != ERROR_SUCCESS) {
+		if (debug) mrlog("disp_message: get_module_from_source failed");
+		goto Exit;
+	}
 
 	/* Sometimes source_module_name will come back as a list of libraries,
 	   i.e. this.dll;that.dll;someother.dll. That makes LoadLibraryEx
@@ -92,10 +106,23 @@ static BOOL disp_message(char *log, char *source_name, char *entry_name,
 		}
 	}
 
+//printf("source_module_name = '%s'\n", source_module_name);
+
 	hSourceModule = LoadLibraryEx(source_module_name, NULL,
 		DONT_RESOLVE_DLL_REFERENCES | LOAD_LIBRARY_AS_DATAFILE);
 
+//printf("LoadLibraryEx returns %d\n", hSourceModule);
+
 	if (hSourceModule == NULL) goto Exit;
+
+//printf("About to call FormatMessage(%d, %d, %d, %d, %p, %d, %p)\n",
+//FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_ARGUMENT_ARRAY,
+//hSourceModule,
+//MessageId,
+//MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+//(LPSTR)&pMessage,
+//0,
+//(va_list *)args);
 
 	FormatMessage(
 		FORMAT_MESSAGE_ALLOCATE_BUFFER |
@@ -120,6 +147,7 @@ Exit:
 	return bReturn;
 }
 
+#if 0	/* Doesn't work with W2K3 or XP SP2 */
 struct event *read_log(char *log, int maxage)
 {
 	struct event *e = NULL, *p;
@@ -219,6 +247,94 @@ Exit:
 
 	return e;
 }
+#else	/* Should work for any version */
+struct event *read_log(char *log, int maxage)
+{
+	struct event *e = NULL, *p;
+	DWORD BufSize = 64*1024;	/* works for NT4 and up */
+	DWORD ReadBytes;
+	DWORD NextSize;
+	char *cp;
+	char *pSourceName;
+	char *pComputerName;
+	HANDLE hEventLog = NULL;
+	EVENTLOGRECORD *pBuf, *pBuf0 = NULL;
+	char **args = NULL;
+	char msgbuf[1024];
+
+	hEventLog = OpenEventLog(NULL, log);
+
+	if(hEventLog == NULL) {
+		mrlog("event log can not open.");
+		goto Exit;
+	}
+
+	pBuf0 = big_malloc("read_log (pBuf)", BufSize);
+	pBuf = pBuf0;
+	memset(pBuf, 0, BufSize);
+	while (ReadEventLog(hEventLog,
+			EVENTLOG_BACKWARDS_READ | EVENTLOG_SEQUENTIAL_READ,
+			0,
+			pBuf,
+			BufSize,
+			&ReadBytes,
+			&NextSize)) {
+		if (debug > 1) {
+			mrlog("ReadEventLog returns ReadBytes = %ld",
+				ReadBytes);
+		}
+		while (ReadBytes > 0) {
+			if (debug > 2) mrlog("ReadBytes = %ld", ReadBytes);
+			if (pBuf->TimeGenerated < maxage) {
+				if (debug > 2) mrlog("Too old");
+				goto Next;
+			}
+			p = big_malloc("read_log (node)", sizeof *p);
+			p->next = e;
+			e = p;
+			e->record = pBuf->RecordNumber;
+			e->gtime = pBuf->TimeGenerated;
+			e->wtime = pBuf->TimeWritten;
+			e->id = pBuf->EventID;
+			e->type = pBuf->EventType;
+
+			cp = (char *)pBuf;
+			cp += sizeof(EVENTLOGRECORD);
+
+			pSourceName = cp;
+			cp += strlen(cp)+1;
+
+			pComputerName = cp;
+			cp += strlen(cp)+1;
+
+			e->source = big_strdup("read_log (source)", pSourceName);
+
+			args = get_args(pBuf);
+
+			memset(msgbuf, 0, sizeof msgbuf);
+			disp_message(log, pSourceName, "EventMessageFile",
+				args, pBuf->EventID, msgbuf, sizeof msgbuf);
+			e->message = big_strdup("read_log (message)", msgbuf);
+
+			big_free("read_log (args)", args);
+			args = NULL;
+		Next:
+			ReadBytes -= pBuf->Length;
+			pBuf = (EVENTLOGRECORD *)
+				((LPBYTE)pBuf+pBuf->Length);
+		}
+		pBuf = pBuf0;
+		memset(pBuf, 0, BufSize);
+	}
+
+Exit:
+	big_free("read_log (pBuf)", pBuf0);
+	big_free("read_log (args)", args);
+	if (hEventLog) CloseEventLog(hEventLog);
+
+	return e;
+}
+#endif
 
 void free_log(struct event *e)
 {

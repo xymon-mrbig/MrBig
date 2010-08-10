@@ -3,8 +3,9 @@
 #define TEST_TYPE 1
 #define TEST_SOURCE 2
 #define TEST_MESSAGE 3
+#define TEST_ID 4
 
-#define RULES_MAX 100
+#define RULES_MAX 1000
 
 static struct rules {
 	char *action;
@@ -25,6 +26,7 @@ static void sanitize_message(char *p)
 static char *match_rules(struct event *e)
 {
 	int i;
+	char id[100];
 
 	for (i = 0; i < nrules; i++) {
 		switch (rules[i].test) {
@@ -49,6 +51,10 @@ static char *match_rules(struct event *e)
 			if (strstr(e->message, rules[i].value))
 				return rules[i].action;
 			break;
+		case TEST_ID:
+			sprintf(id, "%ld", (long)e->id);
+			if (!strcmp(id, rules[i].value))
+				return rules[i].action;
 		}
 	}
 	return NULL;
@@ -83,7 +89,10 @@ static void read_msgcfg(/*char *p*/)
 			rules[nrules].test = TEST_SOURCE;
 		} else if (!strcmp(test, "message")) {
 			rules[nrules].test = TEST_MESSAGE;
+		} else if (!strcmp(test, "id")) {
+			rules[nrules].test = TEST_ID;
 		} else {
+			mrlog("In read_msgcfg: bogus test '%s'", test);
 			continue;
 		}
 		rules[nrules++].value = big_strdup("msgs.c/read_msgcfg", value);
@@ -113,60 +122,58 @@ void msgs(char *b, int n)
 	struct event *app, *sys, *sec, *e;
 	int m;
 
+	if (debug > 1) mrlog("msgs(%p, %d)", b, n);
 	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "msgs.cfg");
 	read_cfg("msgs", cfgfile);
 	read_msgcfg(/*cfgfile*/);
 
 	time_t t0 = time(NULL);
 
-	app = read_log("Application", t0-msgage);
-	sys = read_log("System", t0-msgage);
-	sec = read_log("Security", t0-msgage);
 
 	color = "green";
 	p[0] = '\0';
 	m = 0;
+	app = read_log("Application", t0-msgage);
 	for (e = app; e != NULL && m < 4000; e = e->next) {
 		mycolor = match_rules(e);
 		if (mycolor) {
 			sanitize_message(e->message);
-			m = strlen(p);
-			snprintf(p+m, 400, "&%s Application - %s - %s%s\n",
+			snprcat(p, sizeof p, "&%s Application - %s - %s%s\n",
 				mycolor, e->source,
 				ctime(&e->gtime), e->message);
 			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
 				color = mycolor;
 		}
 	}
+	free_log(app);
+	sys = read_log("System", t0-msgage);
 	for (e = sys; e != NULL && m < 4000; e = e->next) {
 		mycolor = match_rules(e);
 		if (mycolor) {
 			sanitize_message(e->message);
-			m = strlen(p);
-			snprintf(p+m, 400, "&%s Application - %s - %s%s\n",
+			snprcat(p, sizeof p, "&%s Application - %s - %s%s\n",
 				mycolor, e->source,
 				ctime(&e->gtime), e->message);
 			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
 				color = mycolor;
 		}
 	}
-	for (e = sec; e != NULL && m < 4000; e = e->next) {
-		mycolor = match_rules(e);
-		if (mycolor) {
-			sanitize_message(e->message);
-			m = strlen(p);
-			snprintf(p+m, 400, "&%s Application - %s - %s%s\n",
-				mycolor, e->source,
-				ctime(&e->gtime), e->message);
-			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
-				color = mycolor;
-		}
-	}
+	free_log(sys);
+//	sec = read_log("Security", t0-msgage);
+//	for (e = sec; e != NULL && m < 4000; e = e->next) {
+//		mycolor = match_rules(e);
+//		if (mycolor) {
+//			sanitize_message(e->message);
+//			snprcat(p, sizeof p, "&%s Application - %s - %s%s\n",
+//				mycolor, e->source,
+//				ctime(&e->gtime), e->message);
+//			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
+//				color = mycolor;
+//		}
+//	}
+//	free_log(sec);
 	snprintf(b, n, "status %s.msgs %s %s\n\n%s\n",
 		mrmachine, color, now, p);
 
-	free_log(app);
-	free_log(sys);
-	free_log(sec);
 	free_cfg();
 }

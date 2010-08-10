@@ -65,8 +65,10 @@ int main(int argc, char **argv)
 		// Send and receive data.
 		bytesRecv = recv(s, recvbuf, sizeof recvbuf, 0);
 		printf("Bytes Recv: %d\n", bytesRecv);
-		fwrite(recvbuf, 1, bytesRecv, stdout);
-		fflush(stdout);
+		if (bytesRecv > 0) {
+			fwrite(recvbuf, 1, bytesRecv, stdout);
+			fflush(stdout);
+		}
 		closesocket(s);
 	}
 

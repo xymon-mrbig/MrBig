@@ -39,7 +39,7 @@ static void read_svccfg(void)
 			} else {
 				status = SERVICE_RUNNING;
 			}
-			strcpy(name, b+1);
+			strlcpy(name, b+1, sizeof name);
 			cfg_mode |= CFG_DISPLAY_NAME;
 		} else {
 			n = sscanf(b, "%s %d", name, &status);
@@ -76,7 +76,7 @@ static struct svc *lookup_svcname(char *p)
 void svcs(char *b, int n)
 {
 	struct svc *pc, *pl;
-	char p[300], q[5000];
+	char q[5000];
 	char cfgfile[1024];
 	int i, running = 0;
 	char *color = "green", *mycolor;
@@ -84,6 +84,8 @@ void svcs(char *b, int n)
 	ENUM_SERVICE_STATUS_PROCESS *svc;
 	DWORD needed = 0, nsvcs = 0, resume = 0;
 	SC_HANDLE sc;
+
+	if (debug > 1) mrlog("svcs(%p, %d)", b, n);
 
 	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "services.cfg");
 	read_cfg("svcs", cfgfile);
@@ -124,10 +126,9 @@ void svcs(char *b, int n)
 			}
 			if (strcmp(mycolor, "green"))
 				color = mycolor;
-			snprintf(p, sizeof p,
+			snprcat(q, sizeof q,
 				"&%s %s - status %d (expected %d)\n",
 				mycolor, pl->name, pl->status, pc->status);
-			strncat(q, p, sizeof q);
 			big_free("svcs (pc->name)", pc->name);
 			big_free("svcs (pc)", pc);
 		}

@@ -15,6 +15,8 @@ void clear_cfg(void)
 {
 	struct config *c;
 
+	if (debug > 1) mrlog("clear_cfg()");
+
 	while (conf) {
 		c = conf;
 		conf = c->next;
@@ -28,6 +30,7 @@ void add_cfg(char *name, char *cfg)
 {
 	struct config *c;
 
+	if (debug > 1) mrlog("add_cfg(%s, %s)", name, cfg);
 	for (c = conf; c && strcmp(name, c->name); c = c->next);
 	if (c == NULL) {
 		c = big_malloc("add_cfg", sizeof *c);
@@ -48,8 +51,13 @@ int get_cfg(char *name, char *b, size_t n, int line)
 	int i;
 	int retval;
 
+	if (debug > 1) mrlog("get_cfg(%s, %p, %ld, %d)", name, b, n, line);
+
 	for (c = conf; c && strcmp(name, c->name); c = c->next);
-	if (c == NULL) return 0;
+	if (c == NULL) {
+		if (debug) mrlog("get_cfg can't find key %s", name);
+		return 0;
+	}
 
 	p = c->cfg;
 	i = 0;
@@ -72,6 +80,7 @@ int get_cfg(char *name, char *b, size_t n, int line)
 		memcpy(b, p, m);
 		b[m] = '\0';
 	}
+	if (debug > 1) mrlog("get_cfg returns %d (%s)", retval, b);
 	return retval;
 }
 
@@ -85,11 +94,12 @@ static void chomp(char *p)
 
 static void recv_cfg(char *host, int port)
 {
-	struct sockaddr_in in_addr;
+	struct sockaddr_in in_addr, my_addr;
 	int n, s;
 	char b[32000];
 	FILE *fp;
 
+	if (debug > 1) mrlog("recv_cfg(%s, %d)", host, port);
 	fp = fopen("cfg.cache", "w");
 	if (fp == NULL) {
 		mrlog("Can't open cfg.cache for writing");
@@ -102,6 +112,14 @@ static void recv_cfg(char *host, int port)
 	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s == -1) {
 		mrlog("No socket for you!");
+		goto Exit;
+	}
+	memset(&my_addr, 0, sizeof my_addr);
+	my_addr.sin_family = AF_INET;
+	my_addr.sin_port = 0;
+	my_addr.sin_addr.s_addr = inet_addr(bind_addr);
+	if (bind(s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
+		mrlog("In recv_cfg: can't bind local address %s", bind_addr);
 		goto Exit;
 	}
 	memset(&in_addr, 0, sizeof in_addr);
@@ -128,17 +146,20 @@ void read_cfg(char *cat, char *filename)
 
 	if (filename == NULL) return;
 
+	if (debug > 1) mrlog("read_cfg(%s, %s)", cat, filename);
 	fp = fopen(filename, "r");
 	if (fp == NULL) return;
 
-	strncpy(category, cat, sizeof category);
+	strlcpy(category, cat, sizeof category);
 
 	while (fgets(b, sizeof b, fp)) {
 		chomp(b);
 		if (b[0] == '[') {
-			strncpy(category, b+1, sizeof category);
+			strlcpy(category, b+1, sizeof category);
 			q = strchr(category, ']');
 			if (q) *q = '\0';
+		} else if (!strncmp(b, ".bind ", 6)) {
+			sscanf(b, ".bind %s", bind_addr);
 		} else if (!strncmp(b, ".config ", 8)) {
 			n = sscanf(b, ".config %s %d", host, &port);
 			if (n == 2 && port != 0) {

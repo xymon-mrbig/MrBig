@@ -93,8 +93,12 @@ static PERF_OBJECT_TYPE *get_object(PERF_DATA_BLOCK *bp, int object)
 	int a;
 	PERF_OBJECT_TYPE *op;
 
+	if (debug > 1) mrlog("get_object(%p, %d)", bp, object);
+
 	op = first_object(bp);
 	for (a = 0; a < bp->NumObjectTypes; a++) {
+		if (debug > 1) mrlog("object %d is %d", a,
+					op->ObjectNameTitleIndex);
 		if (op->ObjectNameTitleIndex == object) return op;
 		op = next_object(op);
 	}
@@ -119,28 +123,48 @@ struct perfcounter *read_perfcounters(DWORD object, DWORD *counters,
 	DWORD ret;
 	struct counter_info *ci;
 	PERF_OBJECT_TYPE *object_ptr;
-	PERF_DATA_BLOCK *data_block_ptr;
 	PERF_COUNTER_BLOCK *counter_block_ptr;
 	PERF_INSTANCE_DEFINITION *instance_ptr;
 	DWORD type;
 	wchar_t *name_ptr;
 	struct perfcounter *results;
+
+	if (debug) mrlog("read_perfcounters(object = %ld)", (long)object);
+
 	/* check to see how many counters we are interested in */
-	for (ncounters = 0; counters[ncounters]; ncounters++);
+	for (ncounters = 0; counters[ncounters]; ncounters++) {
+		if (debug > 1) mrlog("counters[%d] = %ld",
+			ncounters, (long)counters[ncounters]);
+	}
+
+	if (debug > 1) mrlog("%d interesting counters", ncounters);
+
 	snprintf(obj, sizeof obj, "%ld", (long)object);
-	while ((ret = RegQueryValueEx(HKEY_PERFORMANCE_DATA,
-				obj, 0, &type,
-				(BYTE *)data, &size)) != ERROR_SUCCESS) {
+	if (debug > 2) mrlog("About to call RegQueryValueEx");
+	ret = RegQueryValueEx(HKEY_PERFORMANCE_DATA, obj, 0, &type,
+			(BYTE *)data, &size);
+	if (debug > 2) mrlog("RegQueryValueEx returned %ld", ret);
+	while (ret != ERROR_SUCCESS) {
 		if (ret == ERROR_MORE_DATA) {
+			if (debug > 1) mrlog("Increase buffer");
 			size += DEFAULT_BUFFER_SIZE;
 			data = big_realloc("read_perfcounters (data)", data, size);
 		} else {
+			if (debug) mrlog("Giving up");
 			big_free("read_perfcounters (data)", data);
 			return NULL;
 		}
+		ret = RegQueryValueEx(HKEY_PERFORMANCE_DATA, obj, 0, &type,
+				(BYTE *)data, &size);
 	}
-	data_block_ptr = data;
+	if (debug > 1) mrlog("RegQueryValueEx returned ERROR_SUCCESS");
 	object_ptr = get_object(data, object);
+	if (debug > 2) mrlog("get_object returned %p", object_ptr);
+	if (object_ptr == NULL) {
+		mrlog("Can't get object %d, giving up", object);
+		big_free("read_perfcounters (data)", data);
+		return NULL;
+	}
 	if (perf_time) *perf_time = object_ptr->PerfTime.QuadPart;
 	if (perf_freq) *perf_freq = object_ptr->PerfFreq.QuadPart;
 	ci = big_malloc("read_perfcounters (ci)", ncounters * sizeof *ci);
@@ -149,10 +173,14 @@ struct perfcounter *read_perfcounters(DWORD object, DWORD *counters,
 	}
 
 	if (object_ptr->NumInstances == PERF_NO_INSTANCES) {
-		results = big_malloc("read_perfcounters (results)", sizeof *results);
+		if (debug > 1) mrlog("No instances");
+		results = big_malloc("read_perfcounters (results)",
+				sizeof *results);
 		results[0].instance = NULL;
-		results[0].value = big_malloc("read_perfcounters (value)", ncounters * sizeof *results[0].value);
-		counter_block_ptr = (PERF_COUNTER_BLOCK *)((BYTE *)object_ptr+object_ptr->DefinitionLength);
+		results[0].value = big_malloc("read_perfcounters (value)",
+				ncounters * sizeof *results[0].value);
+		counter_block_ptr = (PERF_COUNTER_BLOCK *)
+			((BYTE *)object_ptr+object_ptr->DefinitionLength);
 		for (i = 0; i < ncounters; i++) {
 			memset(&(results[0].value[i]),
 				sizeof results[b].value[i],
@@ -164,11 +192,14 @@ struct perfcounter *read_perfcounters(DWORD object, DWORD *counters,
 		goto Done;
 	}
 
-	results = big_malloc("read_perfcounter (results)", (1+object_ptr->NumInstances) * sizeof *results);
+	results = big_malloc("read_perfcounter (results)",
+			(1+object_ptr->NumInstances) * sizeof *results);
 	instance_ptr = first_instance(object_ptr);
 	for (b = 0; b < object_ptr->NumInstances; b++) {
-		results[b].value = big_malloc("read_perfcounter (value)", ncounters * sizeof *results[b].value);
-		name_ptr = (wchar_t *)((BYTE *)instance_ptr+instance_ptr->NameOffset);
+		results[b].value = big_malloc("read_perfcounter (value)",
+				ncounters * sizeof *results[b].value);
+		name_ptr = (wchar_t *)
+			((BYTE *)instance_ptr+instance_ptr->NameOffset);
 		counter_block_ptr = get_counter_block(instance_ptr);
 		results[b].instance = dup_wide_to_multi(name_ptr);
 		for (i = 0; i < ncounters; i++) {
@@ -184,14 +215,17 @@ struct perfcounter *read_perfcounters(DWORD object, DWORD *counters,
 	results[b].instance = NULL;
 
 Done:
-	big_free("read_perfcounters (ci)", ci);
+	if (debug > 1) mrlog("read_perfcounters returns %p", results);
 	big_free("read_perfcounters (data)", data);
+	big_free("read_perfcounters (ci)", ci);
 	return results;
 }
 
 void free_perfcounters(struct perfcounter *pc)
 {
 	int i;
+
+	if (debug > 1) mrlog("free_perfcounters(%p)", pc);
 
 	if (pc == NULL) return;
 
@@ -212,6 +246,8 @@ void free_perfcounters(struct perfcounter *pc)
 void print_perfcounters(struct perfcounter *pc, int ncounters)
 {
 	int i, j;
+
+	if (debug > 1) mrlog("print_perfcounters(%p, %d)", pc, ncounters);
 
 	if (pc == NULL) {
 		printf("No counters\n");

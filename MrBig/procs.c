@@ -105,6 +105,8 @@ void procs(char *b, int n)
 	struct cfg *pc;
 	int m, running;
 	plist = NULL;
+
+	if (debug > 1) mrlog("procs(%p, %d)", b, n);
 	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "procs.cfg");
 	read_cfg("procs", cfgfile);
 	read_proccfg(/*cfgfile*/);
@@ -124,7 +126,7 @@ void procs(char *b, int n)
 			color = mycolor;
 		snprintf(p, sizeof p, "&%s %s - %d running (min %d, max %d)\n",
 			mycolor, pc->name, m, pc->min, pc->max);
-		strncat(q, p, sizeof q);
+		strlcat(q, p, sizeof q);
 		big_free("procs (pc->name)", pc->name);
 		big_free("procs (pc)", pc);
 	}
@@ -141,9 +143,8 @@ void procs(char *b, int n)
 		mrmachine, color, now, q, running);
 }
 
-#if 1	/* Works for NT 4 and up; requires psapi.dll */
-#include <psapi.h>
 
+/* Works for NT 4 and up; requires psapi.dll */
 void PrintProcessNameAndID( DWORD processID )
 {
     TCHAR szProcessName[MAX_PATH] = TEXT("<unknown>");
@@ -193,39 +194,6 @@ static BOOL GetProcessList(void)
         PrintProcessNameAndID( aProcesses[i] );
     return TRUE;
 }
-#else	/* Don't use: requires W2K or higher */
-static BOOL GetProcessList(void)
-{
-	HANDLE hProcessSnap;
-	PROCESSENTRY32 pe32;
-
-	// Take a snapshot of all processes in the system.
-	hProcessSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-	if (hProcessSnap == INVALID_HANDLE_VALUE) {
-		printError("CreateToolhelp32Snapshot (of processes)");
-		return (FALSE);
-	}
-	// Set the size of the structure before using it.
-	pe32.dwSize = sizeof(PROCESSENTRY32);
-
-	// Retrieve information about the first process,
-	// and exit if unsuccessful
-	if (!Process32First(hProcessSnap, &pe32)) {
-		printError("Process32First");	// Show cause of failure
-		CloseHandle(hProcessSnap);	// Must clean up the snapshot object!
-		return (FALSE);
-	}
-	// Now walk the snapshot of processes, and
-	// display information about each process in turn
-	do {
-		store_procname(pe32.szExeFile);
-	} while (Process32Next(hProcessSnap, &pe32));
-
-	// Don't forget to clean up the snapshot object!
-	CloseHandle(hProcessSnap);
-	return (TRUE);
-}
-#endif
 
 static void printError(TCHAR * msg)
 {

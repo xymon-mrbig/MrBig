@@ -1,14 +1,16 @@
 
 PACKAGE=MrBig
-VERSION=0.5.0
+VERSION=0.9.0
 #CFLAGS=-Wall -O -g -DDEBUG
 CFLAGS=-Wall -O3 -g -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 DOCS=INSTALL EVENTS ChangeLog TODO EXT LARRD logs.cmd testfile.txt
 SRCS=cfg.c cpu.c disk.c msgs.c procs.c svcs.c mrbig.c \
-	service.c readperf.c readlog.c ext_test.c
+	service.c readperf.c readlog.c ext_test.c \
+	strlcpy.c strlcat.c
 HDRS=mrbig.h
 OBJS=cfg.o cpu.o disk.o msgs.o procs.o svcs.o mrbig.o \
-	service.o readperf.o readlog.o ext_test.o
+	service.o readperf.o readlog.o ext_test.o \
+	strlcpy.o strlcat.o
 NTOBJS=cfg.o cpu.o disk.o msgs.o procsnt.o svcs.o mrbig.o \
 	service.o readperf.o readlog.o ext_test.o
 CFG=mrbig.cfg
@@ -35,6 +37,9 @@ minicfg.exe: minicfg.c
 version.exe: version.c
 	$(CC) $(CFLAGS) -o version.exe version.c -lws2_32
 
+proclist.exe: proclist.c
+	$(CC) $(CFLAGS) -o proclist.exe proclist.c -lws2_32
+
 svcscfg.exe: svcscfg.c
 	$(CC) $(CFLAGS) -o svcscfg.exe svcscfg.c -lws2_32
 
@@ -43,6 +48,12 @@ procs.exe: procs.c
 
 procs2.exe: procs2.c
 	$(CC) $(CFLAGS) -o procs2.exe procs2.c -lws2_32 -lpsapi
+
+enumproc.exe: enumproc.c readperf.c
+	$(CC) $(CFLAGS) -o $@ enumproc.c readperf.c -lws2_32
+
+pdhtest.exe: pdhtest.c
+	$(CC) $(CFLAGS) -o $@ pdhtest.c -lpdh
 
 $(OBJS): $(HDRS)
 
@@ -90,7 +101,7 @@ zip: $(ZIPFILES)
 dist: $(DISTFILES)
 	rm -rf $(DISTDIR)
 	mkdir $(DISTDIR)
-	cp Makefile $(DISTFILES) $(DISTDIR)
+	cp $(DISTFILES) $(DISTDIR)
 	tar cf $(DISTDIR).tar $(DISTDIR)
 	gzip -f $(DISTDIR).tar
 	rm -rf $(DISTDIR)

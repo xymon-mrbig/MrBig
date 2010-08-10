@@ -32,24 +32,31 @@ static long get_uptime(void)
 	struct perfcounter *pc;
 	long long perf_time, perf_freq;
 
+	if (debug > 1) mrlog("get_uptime()");
 	pc = read_perfcounters(object, counters, &perf_time, &perf_freq);
-	result = (perf_time-pc[0].value[0])/perf_freq;
+	if (pc) {
+		result = (perf_time-pc[0].value[0])/perf_freq;
+	} else {
+		mrlog("Can't read_perfcounters(2, 674)");
+		result = 0;
+	}
 	free_perfcounters(pc);
+	if (debug > 1) mrlog("get_uptime returns %ld", result);
 	return result;
 }
 
 
 static long pscount(void)
 {
-	int object = 2;
-	DWORD counters[] = {248, 0};
-	LONG result;
-	struct perfcounter *pc;
+	/* NT4 and up, requires psapi.dll */
+	DWORD aProcesses[1024], cbNeeded;
 
-	pc = read_perfcounters(object, counters, NULL, NULL);
-	result = pc[0].value[0];
-	free_perfcounters(pc);
-	return result;
+	if (debug > 1) mrlog("pscount()");
+	if (!EnumProcesses(aProcesses, sizeof(aProcesses), &cbNeeded)) {
+		mrlog("Can't EnumProcesses");
+		return 0;
+	}
+	return cbNeeded / sizeof aProcesses[0];
 }
 
 
@@ -58,9 +65,17 @@ static long users(void)
 	DWORD object = 330;
 	DWORD counters[] = {314, 0};
 	struct perfcounter *pc;
+	long result;
+
+	if (debug > 1) mrlog("users()");
 
 	pc = read_perfcounters(object, counters, NULL, NULL);
-	long result = pc[0].value[0];
+	if (pc) {
+		result = pc[0].value[0];
+	} else {
+		mrlog("Can't read_perfcounters(330, 314)");
+		result = 0;
+	}
 	free_perfcounters(pc);
 	return result;
 }
@@ -82,6 +97,8 @@ static int get_load(int version)
 	int load = 0;
 	double pct;
 
+	if (debug > 1) mrlog("get_load(%d)", version);
+
 	if (version >= 5) {	/* W2K and up */
 		DWORD counters[] = {6, 0};
 		perfc = read_perfcounters(238, counters, NULL, NULL);
@@ -102,7 +119,7 @@ static int get_load(int version)
 	}
 	time1 = time(NULL);
 	pct = proc1-proc0;
-	if (proc0 && time1 != time0) {
+	if (proc0 && time1 > time0) {
 		/* we need two samples! */
 		load = 100-(proc1-proc0)/100000/(time1-time0);
 	} else {
@@ -126,6 +143,9 @@ void cpu(char *b, int n)
 	int pc = pscount();
 	MEMORYSTATUS stat;
 	OSVERSIONINFO osvi;
+	DWORD memusage;
+
+	if (debug > 1) mrlog("cpu(%p, %d)", b, n);
 
 	ZeroMemory(&osvi, sizeof osvi);
 	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
@@ -158,6 +178,7 @@ void cpu(char *b, int n)
 	} else if (load >= cpuyellow && !strcmp(color, "green")) {
 		color = "yellow";
 	}
+	memusage = 100-stat.dwAvailPhys/(stat.dwTotalPhys/100);
 	snprintf(b, n,
 		"status %s.cpu %s %s up: %s, %d users, %d procs, load=%d%%, PhysicalMem: %ldMB (%d%%)\n%s\n"
 		"Memory Statistics\n"
@@ -171,7 +192,8 @@ void cpu(char *b, int n)
 		"%s %s\n",
 		mrmachine, color,
 		now, up, uc, pc, load,
-		stat.dwTotalPhys / (1024*1024), (int)stat.dwMemoryLoad,
+		stat.dwTotalPhys / (1024*1024),
+		(int)memusage,
 		r,
 		WIDTH, (double)stat.dwTotalPhys,
 		WIDTH, (double)stat.dwAvailPhys,
