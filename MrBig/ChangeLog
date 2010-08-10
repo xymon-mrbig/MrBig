@@ -1,4 +1,6 @@
 
+100401	Commented out #include <windows.h> in mrbig.h.
+
 090121	Allow the service to be installed with another service name:
 	mrbig -iSomeOtherServiceName
 	mrbig -uSomeOtherServiceName

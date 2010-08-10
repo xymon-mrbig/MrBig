@@ -3,7 +3,7 @@
 #define _WIN32_WINNT 0x0500
 
 /* All required headers */
-#include <windows.h>
+//#include <windows.h>
 #include <winsock2.h>
 #include <psapi.h>
 #include <limits.h>
