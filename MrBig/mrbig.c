@@ -794,25 +794,27 @@ void mrbig(void)
 			snprcat(now, sizeof now, " [%s]", hostname);
 		}
 
-		cpu(/*b, sizeof b*/);
-check_chunks("after cpu test");
-//		mrsend(b);
+		cpu();
+		check_chunks("after cpu test");
 
-		disk(/*b, sizeof b*/);
-check_chunks("after disk test");
-//		mrsend(b);
+		disk();
+		check_chunks("after disk test");
 
-		msgs(/*b, sizeof b*/);
-check_chunks("after msgs test");
-//		mrsend(b);
+		memory();
+		check_chunks("after memory test");
 
-		procs(/*b, sizeof b*/);
-check_chunks("after procs test");
-//		mrsend(b);
+		msgs();
+		check_chunks("after msgs test");
 
-		svcs(/*b, sizeof b*/);
-check_chunks("after svcs test");
-//		mrsend(b);
+		procs();
+		check_chunks("after procs test");
+
+		svcs();
+		check_chunks("after svcs test");
+
+		wmi();
+		check_chunks("after wmi test");
+
 		if (pickupdir[0]) ext_tests();
 
 		lastrun = t;

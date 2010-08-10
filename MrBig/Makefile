@@ -1,17 +1,17 @@
 
 PACKAGE=MrBig
-VERSION=0.17.1
+VERSION=0.18.0
 #CFLAGS=-Wall -O -g -DDEBUG
 CFLAGS=-Wall -O3 -g -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 DOCS=INSTALL EVENTS ChangeLog TODO EXT LARRD logs.cmd testfile.txt
-SRCS=cfg.c cpu.c disk.c msgs.c procs.c svcs.c mrbig.c \
+SRCS=cfg.c cpu.c disk.c memory.c msgs.c procs.c svcs.c mrbig.c \
 	service.c readperf.c readlog.c ext_test.c \
-	strlcpy.c
-HDRS=mrbig.h
-OBJS=cfg.o cpu.o disk.o msgs.o procs.o svcs.o mrbig.o \
+	strlcpy.c disphelper.c wmi.c
+HDRS=mrbig.h disphelper.h
+OBJS=cfg.o cpu.o disk.o memory.o msgs.o procs.o svcs.o mrbig.o \
 	service.o readperf.o readlog.o ext_test.o \
-	strlcpy.o
-NTOBJS=cfg.o cpu.o disk.o msgs.o procsnt.o svcs.o mrbig.o \
+	strlcpy.o disphelper.o wmi.o
+NTOBJS=cfg.o cpu.o disk.o memory.o msgs.o procsnt.o svcs.o mrbig.o \
 	service.o readperf.o readlog.o ext_test.o
 CFG=mrbig.cfg
 DISTCFG=mrbig.cfg.dist mrbig.cfg.minicfg
@@ -27,11 +27,18 @@ all:
 	make -C X86 mrbig.exe
 	make -C X64 mrbig64.exe
 
+mrwmi:
+	make -C X86 mrwmi.exe
+	make -C X64 mrwmi.exe
+
+mrwmi.exe: $(OBJS) wmi.o disphelper.o
+	$(CC) -o mrwmi.exe $(OBJS) wmi.o disphelper.o -lws2_32 -lpsapi -lole32 -loleaut32 -luuid
+
 mrbig.exe: $(OBJS)
-	$(CC) -o mrbig.exe $(OBJS) -lws2_32 -lpsapi
+	$(CC) -o mrbig.exe $(OBJS) -lws2_32 -lpsapi -lole32 -loleaut32 -luuid
 
 mrbig64.exe: $(OBJS)
-	$(CC) -o mrbig64.exe $(OBJS) -lws2_32 -lpsapi
+	$(CC) -o mrbig64.exe $(OBJS) -lws2_32 -lpsapi -lole32 -loleaut32 -luuid
 
 mrbignt.exe: $(NTOBJS)
 	$(CC) -o mrbignt.exe $(NTOBJS) -lws2_32 -lpsapi
@@ -111,7 +118,7 @@ upload: zip dist
 	scp $(DISTDIR).tar.gz $(ARCHIVE)/Sources
 
 beta:
-	rm mrbig.exe
+	rm -f X86/mrbig.exe
 	make all
-	scp mrbig.exe $(ARCHIVE)/Beta/mrbig-$(BETAVERSION)-beta.exe
+	scp X86/mrbig.exe $(ARCHIVE)/Beta/mrbig-$(BETAVERSION)-beta.exe
 

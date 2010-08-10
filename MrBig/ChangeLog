@@ -2,6 +2,8 @@
 081113	Display architecture in cpu status page.
 	Changed format of disk status page to not confuse the
 	rrd module do_disk.c in hobbit.
+	New test for memory in memory.c. Status page is compatible
+	with the rrd module do_memory.c in hobbit.
 
 081112	Multi-architecture build environment.
 
