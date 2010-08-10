@@ -41,25 +41,55 @@ static char *match_rules(struct event *e, char *log)
 			    (e->type == EVENTLOG_AUDIT_FAILURE &&
 				!strcmp(rules[i].value, "audit_failure")) ||
 			    (e->type == EVENTLOG_AUDIT_SUCCESS &&
-				!strcmp(rules[i].value, "audit_success")))
+				!strcmp(rules[i].value, "audit_success"))) {
+				if (debug > 1) {
+					mrlog("returning %s because type is %s",
+						rules[i].action,
+						rules[i].value);
+				}
 				return rules[i].action;
+			}
 			break;
 		case TEST_SOURCE:
-			if (!strcmp(e->source, rules[i].value))
+			if (!strcmp(e->source, rules[i].value)) {
+				if (debug > 1) {
+					mrlog("returning %s because source is %s",
+						rules[i].action,
+						rules[i].value);
+				}
 				return rules[i].action;
+			}
 			break;
 		case TEST_MESSAGE:
-			if (strstr(e->message, rules[i].value))
+			if (strstr(e->message, rules[i].value)) {
+				if (debug > 1) {
+					mrlog("returning %s because message matches %s",
+						rules[i].action,
+						rules[i].value);
+				}
 				return rules[i].action;
+			}
 			break;
 		case TEST_ID:
 			sprintf(id, "%ld", (long)e->id);
-			if (!strcmp(id, rules[i].value))
+			if (!strcmp(id, rules[i].value)) {
+				if (debug > 1) {
+					mrlog("returning %s because id is %s",
+						rules[i].action,
+						rules[i].value);
+				}
 				return rules[i].action;
+			}
 			break;
 		case TEST_LOG:
-			if (!strcmp(log, rules[i].value))
+			if (!strcmp(log, rules[i].value)) {
+				if (debug > 1) {
+					mrlog("returning %s because log is %s",
+						rules[i].action,
+						rules[i].value);
+				}
 				return rules[i].action;
+			}
 			break;
 		}
 	}
@@ -134,7 +164,7 @@ void msgs(void)
 	char *mycolor, *color, p[5000];
 	struct event /* *app, *sys, *sec, */ *e;
 //struct event *ulric_fibbar;
-struct event *events;
+	struct event *events;
 	int m;
 
 	HKEY hTestKey;
