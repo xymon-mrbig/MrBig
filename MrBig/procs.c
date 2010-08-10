@@ -34,7 +34,11 @@ static void read_proccfg(/*char *p*/)
 	pcfg = NULL;
 	for (i = 0; get_cfg("procs", b, sizeof b, i); i++) {
 		if (b[0] == '#') continue;
-		n = sscanf(b, "%s %d %d", name, &min, &max);
+		if (b[0] == '"') {
+			n = sscanf(b+1, "%[^\"]\" %d %d", name, &min, &max);
+		} else {
+			n = sscanf(b, "%s %d %d", name, &min, &max);
+		}
 		if (n < 1) continue;
 		if (n < 2) min = 1;
 		if (n < 3) max = min;

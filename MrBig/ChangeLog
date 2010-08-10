@@ -1,4 +1,8 @@
 
+081106	In procs.c: allow process names in double quotes, e.g.
+	"Ulric fibbar.exe" 1 2
+	Released 0.17.0
+
 080130	More debugging code in msgs.c.
 
 080122	Fixed a bug in the memory debugging code.

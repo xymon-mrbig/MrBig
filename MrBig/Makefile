@@ -1,7 +1,7 @@
 
 CC=/cygdrive/d/MinGW/bin/gcc.exe
 PACKAGE=MrBig
-VERSION=0.16.2
+VERSION=0.17.0
 #CFLAGS=-Wall -O -g -DDEBUG
 CFLAGS=-Wall -O3 -g -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 DOCS=INSTALL EVENTS ChangeLog TODO EXT LARRD logs.cmd testfile.txt
