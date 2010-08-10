@@ -1,0 +1,55 @@
+
+Looks for events in the Application, System and Security logs.
+Scans from the most recent entries backwards. Has a maximum age
+beyond which any entries are ignored.
+
+The maximum age is determined by the msgage directive in mrbig.cfg.
+
+Messages are filtered according to rules in msgs.cfg. Messages can
+be filtered by source, type and message text. Each rule follows this
+format:
+
+action test value
+
+The action is one of red, yellow, green or ignore.
+
+The test is one of source, type or message.
+
+The value depends on the test. For the source test, value is the
+complete name of the message source. For the message test, value
+is part of the message text. For the type test, value is one of
+success, warning, error, audit_success or audit_failure.
+
+
+Filtering might look something like:
+
+red type error
+red type audit_failure
+yellow type warning
+
+This will give the same default behaviour as the current BB client.
+
+Add rules to ignore all messages from Dhcp:
+
+ignore source dhcp
+
+Finally we want everything about the master browser, but no alarm:
+
+green message master browser
+
+The list of rules is scanned from top to bottom. Every message log entry
+is matched against the list. The first rule that matches determines
+what will happen:
+
+ignore = throw the entry away without looking at the other rules
+red = red alarm
+yellow = yellow alarm
+green = green "alarm"
+
+If an entry falls through without matching any rule, it is discarded.
+This also means that an empty or missing msgs.cfg will not generate
+any message alarms at all.
+
+Matching is case-sensitive. The source string must match exactly.
+The message string only has to match part of the event log entry.
+

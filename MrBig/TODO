@@ -1,0 +1,181 @@
+
+cpu: measure most active processes
+
+procs: add severity level (color) to the config format
+
+Use printError from procs.c more.
+
+Support for more than one display.
+Create this structure:
+
+struct displayaddr {
+	struct sockaddr_in in_addr;
+	struct displayaddr *next;
+} mrdisplay;
+
+Then change the configuration reader like this:
+
+struct displayaddr *mp = mrdisplay;
+while (mrdisplay) {
+	mrdisplay = mp->next;
+	free(mp);
+}
+
+...
+
+if (!strcmp(key, "display")) {
+	mp = big_malloc(sizeof *mp);
+	memset(&mp->in_addr, 0, sizeof mp->in_addr);
+	mp->in_addr.sin_family = AF_INET;
+	mp->in_addr.sin_port = 
+	char *p = strchr(value, ':');
+	if (p) {
+		*p++ = '\0';
+		mp->in_addr.sin_port = htons(atoi(p));
+	} else {
+		mp->in_addr.sin_port = htons(mrport);
+	}
+	mp->in_addr.sin_addr.s_addr = inet_addr(value);
+	mp->next = mrdisplay;
+	mrdisplay = mp;
+}
+
+And modify mrsend like this:
+
+struct displayaddr *mp = mrdisplay;
+for (mp = mrdisplay; mp; mp = mp->next) {
+	...
+	if (connect(s, (struct sockaddr *)&mp->in_addr, sizeof mp->in_addr) == -1) {
+		mrlog("Can't connect");
+		goto Exit;
+	}
+	...
+}
+
+Piece of cake!
+
+---
+
+Unified mrbig.cfg for everything. Use headings to separate settings
+for different modules:
+
+[disk]
+
+C		30	60
+
+[msgs]
+
+red type error
+red type audit_failure
+yellow type warning
+
+[ext]
+
+C:\MrBig\child.cmd
+
+The separate files that exist today will be used in the future as
+well if they exist, but will be deprecated in favor of the unified
+format.
+
+The [mrbig] header will be used for global settings that are in
+mrbig.cfg today, but it will not be necessary since anything that
+appears before the first header is trated as global.
+
+---
+
+Add an include directive to the configuration format. Or?
+
+---
+
+Centralised configuration: create a daemon that listens on a port.
+Clients connect to get their configuration. The server matches the
+client's IP address against a configuration repository. If found,
+the configuration is sent, followed by a single . on a line by
+itself.
+
+The client reads the configuration and stores it in a cache file.
+If the config daemon can't be reached or the transmission is
+interrupted, the configuration is read from the cache file.
+
+With this system, this mrbig.cfg would be enough:
+
+config 10.0.4.5 1985
+
+The new configuration logic would be:
+
+mrbig.cfg
+disk.cfg, if it exists
+ext.cfg, if it exists
+msgs.cfg, if it exists
+procs.cfg, if it exists
+services.cfg, if it exists
+
+clear_cfg();
+read_cfg("mrbig", "mrbig.cfg");
+read_cfg("disk", "disk.cfg");
+read_cfg("ext", "ext.cfg");
+read_cfg("msgs", "msgs.cfg");
+read_cfg("procs", "procs.cfg");
+read_cfg("services", "services.cfg");
+
+Create a new config structure like this:
+
+struct config {
+	char *name;	/* mrbig, disk, ext et al */
+	char *cfg	/* text as read from cfg files */
+	struct config *next;
+} *cfg;
+
+New functions for management:
+
+void add_cfg(char *name, char *cfg);
+
+Adds one line to the specified destination.
+
+void read_cfg(char *name, char *b, size_t n, int line);
+
+Reads one line from the configuration and puts it into buffer b.
+No more than n characters are returned, including the final \0.
+Returns 1 if successful, 2 if the line is too long and 0 if
+the specified line does not exist.
+
+So to read all disk config lines:
+
+for (i = 0; read_cfg("disk", b, sizeof b, i); i++) {
+	;	/* whatever */
+}
+
+That's quite easy.
+
+OK, done. Now make each test read the configuration using
+get_cfg rather than from a file. This change is done in
+mrbig.c, disk.c, ext_text.c, msgs.c, procs.c, svcs.c.
+
+---
+
+In services.cfg, treat services enclosed in quotation marks
+as display names. I.e.
+
+"Windows Firewall/Internet Connection Sharing (ICS)"
+
+Use the first and last quotation marks in the string, to
+allow display names with quotations marks in them, e.g.
+
+"Lotus is a "really stupid" service"
+
+I don't want to allow a mix of service and display names in
+the configuration, because that makes it a lot harder to
+do the monitoring. Rather assume that all are display names
+unless they start with a double quote. If the configuration
+is mixed, send a red status.
+
+---
+
+I should perhaps use the funtions from psapi.dll to check
+processes. It is compatible with NT4 if the dll is installed.
+
+---
+
+Use Get ProcessMemoryInfo to list process memory usage.
+
+

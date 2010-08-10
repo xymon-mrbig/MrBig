@@ -1,0 +1,73 @@
+
+050130	Rewrote procs.c so the same code can run on NT4 and W2K. This
+	requires psapi.dll, which is a free download on NT4.
+	Added Windows version and MrBig version to cpu status message.
+	In cpu.c: get_load() works for NT4 and W2K and reads
+	load average from registry.
+
+041210	Updated readcfg in mrbig.c to handle spaces in values, e.g. paths.
+
+041207	Changed the [services] header in mrbig.cfg.dist to [svcs].
+
+041125	Added -t option to run standalone (not as service) for testing.
+	Fixed potential divide by zero in cpu.c.
+	Wrote a sample mrbig.cfg.dist with all sections and removed
+	the other cfg files.
+
+041124	Use "double quotes" to specify display names rather than
+	service names in the configuration. It is not allowed to
+	mix service and display names.
+
+041123	Added [headers] to the configuration format.
+	New .include directive in the configuration file.
+	New .config directive gets configuration from server.
+	Writes cached config to C:\windows\system32\cfg.cache.
+	New minibbd server logs received messages to stdout.
+	New minicfg server to test .config directive.
+	Call WSAStartup only when the service starts and
+	WSACleanup only when it is stopped.
+
+041025	In cpu.c: print memory statistics using double rather than
+	long to avoid overflow.
+	In mrbig.c: allow multiple displays.
+	Released 0.3.2.
+
+041015	Removed every single instance of sprintf, strcpy and
+	strcat, even where buffer overflow is impossible.
+	The new function snprcat works like snprintf but prints
+	at the end of the string rather than the beginning.
+	Changed start type from DEMAND to AUTO in CreateService call.
+	Released 0.3.1.
+
+041012	Individual yellow and red levels for filesystems in disk.cfg.
+	In disk.c: Show which filesystems have error conditions.
+	In cpu.c: Added "Machine recently rebooted" lines.
+	Moved get_uptime into cpu.c and removed uptime.c.
+	Moved pscount into cpu.c and removed pscount.c.
+	Moved users into cpu.c and removed users.c.
+	Fixed up the formats of the various tests to better match
+	the original.
+	Figured out the horrible code that must be fixed in Larrd
+	to make memory graphs work. See LARRD.
+	Released 0.3.0.
+
+041010	Logging functions to open and close files.
+	Added status code explanations to the svcs test.
+
+041009	Use Mingw rather than Cygwin to compile. Minor changes to
+	mrsend() to use winsock2 rather than bsd socket.
+
+041007	Fixed memory leaks. Logging memory management functions,
+	define DEBUG_MEMORY to use.
+	Released 0.1.0.
+
+041006	Finally figured out how to calculate CPU load (cpu.c).
+	Fixed the uptime display in cpu.c.
+	Fixed the capacity percentage in disk.c
+	Added external tests (ext_test.c)
+
+041006	Released 0.0.2.
+
+041005	Added event log scanning. Filter based on type, source or message.
+	Replaced ad-hoc registry reading code with read_perfcounters.
+
