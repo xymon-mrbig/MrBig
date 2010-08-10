@@ -1,5 +1,8 @@
 #include "mrbig.h"
 
+#define MEMSIZE 4
+#define PATTERN_SIZE (sizeof big_pattern)
+
 static char cfgfile[256];
 char mrmachine[256], bind_addr[256] = "0.0.0.0";
 static struct display {
@@ -18,6 +21,7 @@ int memyellow, memred;
 int debug = 0;
 int dirsep;
 int msgage;
+int memsize = MEMSIZE;
 int standalone = 0;
 
 /* nosy memory management */
@@ -47,8 +51,6 @@ static unsigned char big_pattern[] = {
 //	'1','2','3','4','5','6','7','8','9','0',
 	'q','w','e','r','t','y'
 };
-
-#define PATTERN_SIZE (sizeof big_pattern)
 
 void mrlog(char *fmt, ...)
 {
@@ -192,39 +194,47 @@ static void remove_chunk(void *p, char *cl)
 void *big_malloc(char *p, size_t n)
 {
 	void *a;
+	size_t m;
 
-	if (debug_memory) a = malloc(n+PATTERN_SIZE);
-	else a = malloc(n);
+	if (debug_memory) m = memsize*(n+PATTERN_SIZE);
+	else m = memsize*n;
+
+	a = malloc(memsize*n);
 
 	if (debug > 2) {
 		mrlog("Allocating %ld bytes (%p) on behalf of %s",
-			(long)n, a, p);
+			(long)m, a, p);
 	}
 	if (a == NULL) {
 		mrlog("Allocation '%s' failed, exiting", p);
 		mrexit("Out of memory", EXIT_FAILURE);
 	}
-	store_chunk(a, n, p);
+	store_chunk(a, m, p);
 	return a;
 }
 
 void *big_realloc(char *p, void *q, size_t n)
 {
 	void *a;
+	size_t m;
+
+	if (debug_memory) m = memsize*(n+PATTERN_SIZE);
+	else m = memsize*n;
+
 	remove_chunk(q, p);
-	if (debug_memory) a = realloc(q, n+PATTERN_SIZE);
-	else a = realloc(q, n);
+	if (debug_memory) a = realloc(q, m);
+	else a = realloc(q, m);
 
 	if (debug > 2) {
 		mrlog("Reallocating %ld bytes (%p => %p) on behalf of %s",	
-			(long)n, q, a, p);
+			(long)m, q, a, p);
 	}
 
 	if (a == NULL) {
 		mrlog("Allocation '%s' failed, exiting", p);
 		mrexit("Out of memory", EXIT_FAILURE);
 	}
-	store_chunk(a, n, p);
+	store_chunk(a, m, p);
 	return a;
 }
 
@@ -346,12 +356,14 @@ void no_return(char *p)
 
 int snprcat(char *str, size_t size, const char *fmt, ...)
 {
-	int n;
+	int n, r;
 	va_list ap;
 
 	va_start(ap, fmt);
 	n = strlen(str);
-	return vsnprintf(str+n, size-n, fmt, ap);
+	r = vsnprintf(str+n, size-n, fmt, ap);
+	str[size-1] = '\0';
+	return r;
 }
 
 struct gracetime {
@@ -419,6 +431,7 @@ static void readcfg(void)
 	memyellow = 100;
 	memred = 100;
 	msgage = 3600;
+	memsize = MEMSIZE;
 	pickupdir[0] = '\0';
 	if (logfp) big_fclose("readcfg:logfile", logfp);
 	logfp = NULL;
@@ -479,6 +492,13 @@ static void readcfg(void)
 				int grace = 0;
 				sscanf(value, "%s %d", test, &grace);
 				insert_grace(test, grace);
+			} else if (!strcmp(key, "memsize")) {
+				memsize = atoi(value);
+			} else if (!strcmp(key, "set")) {
+				char key[1000], value[1000];
+				key[0] = value[0] = '\0';
+				sscanf(value, "%s %s", key, value);
+				mrlog("This doesn't actually do anything");
 			}
 		}
 	}
@@ -677,11 +697,12 @@ void mrsend(char *machine, char *test, char *color, char *message)
 	if (!start_winsock()) return;
 
 	/* Prepare the report */
+	p[0] = '\0';
 	if (is == 1) {
-		snprintf(p, sizeof p, "status %s.%s green %s",
+		snprcat(p, sizeof p, "status %s.%s green %s",
 			machine, test, message);
 	} else {
-		snprintf(p, sizeof p, "status %s.%s %s %s",
+		snprcat(p, sizeof p, "status %s.%s %s %s",
 			machine, test, color, message);
 	}
 
@@ -815,7 +836,8 @@ int main(int argc, char **argv)
 	startup_log("cfgdir = '%s'", cfgdir);
 	p = strrchr(cfgdir, dirsep);
 	if (p) *p = '\0';
-	snprintf(cfgfile, sizeof cfgfile,
+	cfgfile[0] = '\0';
+	snprcat(cfgfile, sizeof cfgfile,
 		"%s%c%s", cfgdir, dirsep, "mrbig.cfg");
 	startup_log("cfgfile = '%s'", cfgfile);
 	startup_log("SystemRoot = '%s'", getenv("SystemRoot"));

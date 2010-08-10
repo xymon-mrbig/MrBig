@@ -89,7 +89,8 @@ void svcs(void)
 
 	if (debug > 1) mrlog("svcs(%p, %d)", b, n);
 
-	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "services.cfg");
+	cfgfile[0] = '\0';
+	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "services.cfg");
 	read_cfg("svcs", cfgfile);
 	read_svccfg();
 	q[0] = '\0';
@@ -146,7 +147,8 @@ void svcs(void)
 			"Can't get service list");
 	}
 	CloseServiceHandle(sc);
-	snprintf(b, n, "%s\n\n%s\n"
+	b[0] = '\0';
+	snprcat(b, n, "%s\n\n%s\n"
 		"Total %d registered services, %d running\n\n"
 		"%d = Not installed\n"
 		"%d = Stopped\n"

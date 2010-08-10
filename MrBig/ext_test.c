@@ -14,15 +14,33 @@ void mrlog(char *p)
 
 static void pickup_file(char *fn)
 {
-	char full_fn[256];
+	char full_fn[256], machname[256], testname[256];
 	char b[4900], s[5000], *p;
 	FILE *fp;
 	size_t n;
 
-	snprintf(full_fn, sizeof full_fn, "%s%c%s", pickupdir, dirsep, fn);
+	if (debug) mrlog("pickup_file(%s)", fn);
+
+	full_fn[0] = machname[0] = testname[0] = '\0';
+	snprcat(full_fn, sizeof full_fn, "%s%c%s", pickupdir, dirsep, fn);
+	if (debug) mrlog("Full path '%s'", full_fn);
+
+	p = strchr(fn, '.');
+	if (p) {
+		strncpy(machname, fn, p-fn);
+		machname[p-fn] = '\0';
+		strncpy(testname, p+1, sizeof testname-1);
+	} else {
+		strncpy(machname, mrmachine, sizeof machname-1);
+		strncpy(testname, fn, sizeof testname-1);
+	}
+	machname[sizeof machname-1] = '\0';
+	testname[sizeof testname-1] = '\0';
 	if (debug) {
 		mrlog("pickup_file(%s)", fn);
 		mrlog("Full path '%s'", full_fn);
+		mrlog("machname = '%s'", machname);
+		mrlog("testname = '%s'", testname);
 	}
 	fp = big_fopen("pickup_file", full_fn, "r");
 	if (!fp) {
@@ -44,9 +62,10 @@ static void pickup_file(char *fn)
 
 	*p++ = '\0';
 
-	snprintf(s, sizeof s, "%s\n\n%s\n", now, p);
+	s[0] = '\0';
+	snprcat(s, sizeof s, "%s\n\n%s\n", now, p);
 
-	mrsend(mrmachine, fn, b, s);
+	mrsend(machname, testname, b, s);
 	big_fclose("pickup_file", fp);
 	remove(full_fn);
 }
@@ -57,7 +76,8 @@ static void pickup(void)
 	WIN32_FIND_DATA FindFileData;
 	HANDLE hFind;
 
-	snprintf(pattern, sizeof pattern, "%s%c*", pickupdir, dirsep);
+	pattern[0] = '\0';
+	snprcat(pattern, sizeof pattern, "%s%c*", pickupdir, dirsep);
 
 	if (debug) {
 		mrlog("pickup()");
@@ -91,7 +111,8 @@ void ext_tests(void)
 
 	if (debug > 1) mrlog("ext_tests()");
 
-	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "ext.cfg");
+	cfgfile[0] = '\0';
+	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "ext.cfg");
 	read_cfg("ext", cfgfile);
 
 	for (i = 0; get_cfg("ext", cmd, sizeof cmd, i); i++) {
@@ -106,6 +127,7 @@ void ext_tests(void)
 				NULL, NULL, &si, &pi)) {
 			/* Wait no more than two minutes */
 			n = WaitForSingleObject(pi.hProcess, 120*1000);
+			if (debug) mrlog("WaitForSingleObject returns %d", n);
 			if (n == WAIT_TIMEOUT) {
 				TerminateProcess(pi.hProcess, EXIT_FAILURE);
 				mrlog("Terminating process");

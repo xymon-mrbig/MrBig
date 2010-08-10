@@ -83,9 +83,9 @@ void disk(void)
 {
 	char b[5000];
 	int n = sizeof b;
-	int i, j;
+	int i, j, res;
 	double yellow, red;
-	char d[10], p[100], q[5000], r[5000], *color = "green";
+	char d[10], q[5000], r[5000], *color = "green";
 	char cfgfile[1024], drive[10];
 	DWORD drives = GetLogicalDrives();
 	unsigned int dtype;
@@ -94,21 +94,28 @@ void disk(void)
 	ULARGE_INTEGER fa, tb, fb;
 
 	if (debug > 1) mrlog("disk(%p, %d)", b, n);
-	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "disk.cfg");
+	cfgfile[0] = '\0';
+	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "disk.cfg");
 	read_cfg("disk", cfgfile);
 	read_diskcfg(/*cfgfile*/);
 
 	r[0] = '\0';
-	snprintf(q, sizeof q, "%-10s %11s %11s %11s %8s %s\n",
+	q[0] = '\0';
+	snprcat(q, sizeof q, "%-10s %11s %11s %11s %8s %s\n",
 		"Filesystem", "1k-blocks", "Used", "Avail", "Capacity",
 		"Mounted");
 	for (i = 'A'; i <= 'Z'; i++) {
 		if (drives & 1) {
-			snprintf(drive, sizeof drive, "%c", i);
-			snprintf(d, sizeof d, "%c:\\", i);
+			drive[0] = d[0] = '\0';
+			snprcat(drive, sizeof drive, "%c", i);
+			snprcat(d, sizeof d, "%c:\\", i);
 			dtype = GetDriveType(d);
+			if (debug) mrlog("%s is type %d", d, dtype);
 			if (dtype == DRIVE_FIXED) {
-				if (!GetDiskFreeSpaceEx(d, &fa, &tb, &fb)) {
+				res = GetDiskFreeSpaceEx(d, &fa, &tb, &fb);
+				if (debug) mrlog("GetDiskFreeSpaceEx returns %d", res);
+				if (res == 0) {
+					mrlog("No size info (%d)", GetLastError());
 					total_bytes = free_bytes = 0;
 					pct = 0;
 				} else {
@@ -131,19 +138,19 @@ void disk(void)
 				}
 				j = 0;
 				/* Filesystem */
-				snprintf(p, sizeof p,
+				snprcat(q, sizeof q,
 					"%-10c %11lu %11lu %11lu %5.1f%%   /FIXED/%c\n",
 					i,
 					(unsigned long) (total_bytes / 1024),
 					(unsigned long) ((total_bytes - free_bytes) / 1024),
 					(unsigned long) (free_bytes / 1024),
 					pct, i);
-				strlcat(q, p, sizeof q);
 			}
 		}
 		drives >>= 1;
 	}
-	snprintf(b, n, "%s\n\n%s\n%s\n", now, r, q);
+	b[0] = '\0';
+	snprcat(b, n, "%s\n\n%s\n%s\n", now, r, q);
 	append_limits(b, n);
 	free_cfg();
 	mrsend(mrmachine, "disk", color, b);

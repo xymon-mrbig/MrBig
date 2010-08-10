@@ -1,4 +1,20 @@
 
+071211	Added new filtering rule for messages: perform action based on
+	log name. Example:
+	ignore log Application
+	Released 0.16.0.
+
+070824	Updated ext_test.c to allow tests to be performed on behalf of
+	other machines. This is done by specifying the file name as
+	machine,example,com.test.
+
+070227	Added a bit of debugging to disk.c.
+
+070118	New debugging option memsize.
+	Bugfix: the information eventlog type was not handled at all.
+	Completely eradicated all use of snprintf and strlcat.
+	Released 0.14.0.
+
 061212	Several changes in mrbig.c to run better on Longhorn.
 	Released 0.13.4.
 

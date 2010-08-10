@@ -1,17 +1,17 @@
 
 CC=/cygdrive/d/MinGW/bin/gcc.exe
 PACKAGE=MrBig
-VERSION=0.13.4
+VERSION=0.16.0
 #CFLAGS=-Wall -O -g -DDEBUG
 CFLAGS=-Wall -O3 -g -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 DOCS=INSTALL EVENTS ChangeLog TODO EXT LARRD logs.cmd testfile.txt
 SRCS=cfg.c cpu.c disk.c msgs.c procs.c svcs.c mrbig.c \
 	service.c readperf.c readlog.c ext_test.c \
-	strlcpy.c strlcat.c
+	strlcpy.c
 HDRS=mrbig.h
 OBJS=cfg.o cpu.o disk.o msgs.o procs.o svcs.o mrbig.o \
 	service.o readperf.o readlog.o ext_test.o \
-	strlcpy.o strlcat.o
+	strlcpy.o
 NTOBJS=cfg.o cpu.o disk.o msgs.o procsnt.o svcs.o mrbig.o \
 	service.o readperf.o readlog.o ext_test.o
 CFG=mrbig.cfg
@@ -21,6 +21,7 @@ EXTRA_DIST=minicfg.c minibbd.c
 DISTFILES=$(CFG) $(DISTCFG) $(SRCS) $(HDRS) $(DOCS) Makefile $(EXTRA_DIST)
 ZIPFILES=$(DISTCFG) $(DOCS) mrbig.exe
 ARCHIVE=ulric@tiffany.365-24.se:/usr/local/apache/vhosts/extranet.365-24.se/MrBig/Archive
+BETAVERSION=`date +%y%m%d%H%M`
 
 all: mrbig.exe
 
@@ -30,6 +31,9 @@ mrbig.exe: $(OBJS)
 mrbignt.exe: $(NTOBJS)
 	$(CC) -o mrbignt.exe $(NTOBJS) -lws2_32 -lpsapi
 
+evilbbd.exe: evilbbd.c
+	$(CC) $(CFLAGS) -o evilbbd.exe evilbbd.c -lws2_32
+
 minibbd.exe: minibbd.c
 	$(CC) $(CFLAGS) -o minibbd.exe minibbd.c -lws2_32
 
@@ -38,6 +42,9 @@ minicfg.exe: minicfg.c
 
 version.exe: version.c
 	$(CC) $(CFLAGS) -o version.exe version.c -lws2_32
+
+mrconnect.exe: mrconnect.c
+	$(CC) $(CFLAGS) -DDEBUG -o mrconnect.exe mrconnect.c -lws2_32
 
 proclist.exe: proclist.c
 	$(CC) $(CFLAGS) -o proclist.exe proclist.c -lws2_32
@@ -112,6 +119,8 @@ upload: zip dist
 	scp mrbig.exe $(PACKAGE)-$(VERSION).zip $(ARCHIVE)/Binaries
 	scp $(DISTDIR).tar.gz $(ARCHIVE)/Sources
 
-beta: clean all
-	scp mrbig.exe $(ARCHIVE)/Beta/mrbig-$(VERSION)-beta.exe
+beta:
+	rm mrbig.exe
+	make all
+	scp mrbig.exe $(ARCHIVE)/Beta/mrbig-$(BETAVERSION)-beta.exe
 

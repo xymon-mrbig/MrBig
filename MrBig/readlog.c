@@ -30,7 +30,8 @@ static BOOL get_module_from_source(char *log,
 	BOOL bReturn = FALSE;
 	char key[1024];
 
-	snprintf(key, sizeof key,
+	key[0] = '\0';
+	snprcat(key, sizeof key,
 		"SYSTEM\\CurrentControlSet\\Services\\EventLog\\%s", log);
 
 	lResult = RegOpenKeyEx(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hAppKey);
@@ -90,7 +91,7 @@ static BOOL disp_message(char *log, char *source_name, char *entry_name,
 			source_name, entry_name, source_module_name);
 
 	if (debug) {
-		printf("get_module_from_source returns %d", bResult);
+		mrlog("get_module_from_source returns %d", bResult);
 	}
 
 	if (bResult != ERROR_SUCCESS) {
@@ -148,8 +149,9 @@ static BOOL disp_message(char *log, char *source_name, char *entry_name,
 	bReturn = TRUE;
 
 Exit:
-	if (pMessage != NULL) snprintf(msgbuf, msgsize, "%s", pMessage);
-	else snprintf(msgbuf, msgsize, "(%d)\n", (int)MessageId);
+	msgbuf[0] = '\0';
+	if (pMessage != NULL) snprcat(msgbuf, msgsize, "%s", pMessage);
+	else snprcat(msgbuf, msgsize, "(%d)\n", (int)MessageId);
 
 	if (hSourceModule != NULL) FreeLibrary(hSourceModule);
 	if (pMessage != NULL) LocalFree(pMessage);

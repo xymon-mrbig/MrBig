@@ -101,7 +101,7 @@ void procs(void)
 {
 	char b[5000];
 	int n = sizeof b;
-	char p[100], q[5000], *color = "green", *mycolor;
+	char q[5000], *color = "green", *mycolor;
 	char cfgfile[1024];
 	struct proc *pl;
 	struct cfg *pc;
@@ -109,7 +109,8 @@ void procs(void)
 	plist = NULL;
 
 	if (debug > 1) mrlog("procs(%p, %d)", b, n);
-	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "procs.cfg");
+	cfgfile[0] = '\0';
+	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "procs.cfg");
 	read_cfg("procs", cfgfile);
 	read_proccfg(/*cfgfile*/);
 	GetProcessList();
@@ -126,9 +127,10 @@ void procs(void)
 		}
 		if (strcmp(mycolor, "green"))
 			color = mycolor;
-		snprintf(p, sizeof p, "&%s %s - %d running (min %d, max %d)\n",
+//		p[0] = '\0';
+		snprcat(q, sizeof q, "&%s %s - %d running (min %d, max %d)\n",
 			mycolor, pc->name, m, pc->min, pc->max);
-		strlcat(q, p, sizeof q);
+//		strlcat(q, p, sizeof q);
 		big_free("procs (pc->name)", pc->name);
 		big_free("procs (pc)", pc);
 	}
@@ -140,7 +142,8 @@ void procs(void)
 		big_free("procs (pl)", pl);
 		running++;
 	}
-	snprintf(b, n, "%s\n\n%s\nTotal %d processes running\n",
+	b[0] = '\0';
+	snprcat(b, n, "%s\n\n%s\nTotal %d processes running\n",
 		now, q, running);
 	mrsend(mrmachine, "procs", color, b);
 }

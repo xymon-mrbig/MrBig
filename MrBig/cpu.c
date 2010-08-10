@@ -167,7 +167,8 @@ void cpu(void)
 	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);
 	if (!GetVersionEx(&osvi) || osvi.dwPlatformId != VER_PLATFORM_WIN32_NT) {
 		/* Failed, boo hiss */
-		snprintf(b, n,
+		b[0] = '\0';
+		snprcat(b, n,
 			"No version info\n"
 			"%s %s\n",
 			PACKAGE, VERSION);
@@ -180,16 +181,17 @@ void cpu(void)
 	//GlobalMemoryStatus(&stat);
 	GlobalMemoryStatusEx(&statex);
 	if (um < bootred) {
-		snprintf(r, sizeof r, "&red Machine recently rebooted\n");
+		snprcat(r, sizeof r, "&red Machine recently rebooted\n");
 		color = "red";
 	} else if (um < bootyellow) {
-		snprintf(r, sizeof r, "&yellow Machine recently rebooted\n");
+		snprcat(r, sizeof r, "&yellow Machine recently rebooted\n");
 		color = "yellow";
 	}
+	up[0] = '\0';
 	if (um < 24*60) {
-		snprintf(up, sizeof up, "%02d:%02d", um/60, um%60);
+		snprcat(up, sizeof up, "%02d:%02d", um/60, um%60);
 	} else {
-		snprintf(up, sizeof up, "%d days", um/(24*60));
+		snprcat(up, sizeof up, "%d days", um/(24*60));
 	}
 	load = get_load(osvi.dwMajorVersion);
 	if (load >= cpured) {
@@ -207,7 +209,8 @@ void cpu(void)
 	} else if (memusage > memyellow && !strcmp(color, "green")) {
 		color = "yellow";
 	}
-	snprintf(b, n,
+	b[0] = '\0';
+	snprcat(b, n,
 		"%s up: %s, %d users, %d procs, load=%d%%, PhysicalMem: %ldMB (%d%%)\n%s\n"
 		"Memory Statistics\n"
 		"Total physical memory:         %*.0f bytes\n"

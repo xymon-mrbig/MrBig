@@ -4,6 +4,7 @@
 #define TEST_SOURCE 2
 #define TEST_MESSAGE 3
 #define TEST_ID 4
+#define TEST_LOG 5
 
 #define RULES_MAX 1000
 
@@ -23,7 +24,7 @@ static void sanitize_message(char *p)
 	}
 }
 
-static char *match_rules(struct event *e)
+static char *match_rules(struct event *e, char *log)
 {
 	int i;
 	char id[100];
@@ -35,8 +36,8 @@ static char *match_rules(struct event *e)
 				!strcmp(rules[i].value, "error")) ||
 			    (e->type == EVENTLOG_WARNING_TYPE &&
 				!strcmp(rules[i].value, "warning")) ||
-			    (e->type == EVENTLOG_SUCCESS &&
-				!strcmp(rules[i].value, "success")) ||
+			    (e->type == EVENTLOG_INFORMATION_TYPE &&
+				!strcmp(rules[i].value, "information")) ||
 			    (e->type == EVENTLOG_AUDIT_FAILURE &&
 				!strcmp(rules[i].value, "audit_failure")) ||
 			    (e->type == EVENTLOG_AUDIT_SUCCESS &&
@@ -55,6 +56,11 @@ static char *match_rules(struct event *e)
 			sprintf(id, "%ld", (long)e->id);
 			if (!strcmp(id, rules[i].value))
 				return rules[i].action;
+			break;
+		case TEST_LOG:
+			if (!strcmp(log, rules[i].value))
+				return rules[i].action;
+			break;
 		}
 	}
 	return NULL;
@@ -91,6 +97,8 @@ static void read_msgcfg(/*char *p*/)
 			rules[nrules].test = TEST_MESSAGE;
 		} else if (!strcmp(test, "id")) {
 			rules[nrules].test = TEST_ID;
+		} else if (!strcmp(test, "log")) {
+			rules[nrules].test = TEST_LOG;
 		} else {
 			mrlog("In read_msgcfg: bogus test '%s'", test);
 			continue;
@@ -145,12 +153,13 @@ struct event *events;
 
     	DWORD i, retCode;
 
-    	TCHAR  achValue[MAX_VALUE_NAME+1];
-    	DWORD cchValue = MAX_VALUE_NAME;
+//    	TCHAR  achValue[MAX_VALUE_NAME+1];
+//    	DWORD cchValue = MAX_VALUE_NAME;
 
 
 	if (debug > 1) mrlog("msgs(%p, %d)", b, n);
-	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "msgs.cfg");
+	cfgfile[0] = '\0';
+	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "msgs.cfg");
 	read_cfg("msgs", cfgfile);
 	read_msgcfg(/*cfgfile*/);
 
@@ -242,7 +251,7 @@ struct event *events;
 				if (debug) mrlog("Reading log %s", achKey);
 				events = read_log(achKey, t0-msgage);
 				for (e = events; e && m < 4000; e = e->next) {
-					mycolor = match_rules(e);
+					mycolor = match_rules(e, achKey);
 					if (mycolor) {
 						sanitize_message(e->message);
 						snprcat(p, sizeof p, "&%s %s - %s - %s%s\n",
@@ -257,7 +266,9 @@ struct event *events;
 		}
 	}
 #endif
-	snprintf(b, n, "%s\n\n%s\n", now, p);
+//	memset(b, 0, sizeof b);
+	b[0] = '\0';
+	snprcat(b, n-1, "%s\n\n%s\n", now, p);
 
 	free_cfg();
 	mrsend(mrmachine, "msgs", color, b);

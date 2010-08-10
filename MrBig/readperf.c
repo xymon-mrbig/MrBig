@@ -139,7 +139,8 @@ struct perfcounter *read_perfcounters(DWORD object, DWORD *counters,
 
 	if (debug > 1) mrlog("%d interesting counters", ncounters);
 
-	snprintf(obj, sizeof obj, "%ld", (long)object);
+	obj[0] = '\0';
+	snprcat(obj, sizeof obj, "%ld", (long)object);
 	if (debug > 2) mrlog("About to call RegQueryValueEx");
 	ret = RegQueryValueEx(HKEY_PERFORMANCE_DATA, obj, 0, &type,
 			(BYTE *)data, &size);
