@@ -69,7 +69,8 @@ void wmi(void)
 	wchar_t query[1000];
 	int i, n, f;
 	char b[1000], key[1000], value[1000];
-	char always[100], *color = "green", *bullet;
+	char *green = "green", *red = "red", *blue = "blue", *clear = "clear";
+	char always[100], *color = green, *bullet;
 	char page[100];
 	char report[10000];
 
@@ -93,18 +94,14 @@ void wmi(void)
 			strcpy(page, value);
 			always[0] = '\0';
 			report[0] = '\0';
-			color = "green";
+			color = green;
 		} else if (!strcmp(key, "end")) {
 			if (!page[0]) {
 				mrlog("wmi end without begin");
 				continue;
 			}
 			if (always[0]) color = always;
-#if 1
 			mrsend(mrmachine, page, color, report);
-#else
-			mrlog("%s: %s: %s\n%s", mrmachine, page, color, report);
-#endif
 		} else if (!strcmp(key, "field")) {
 			fields[nfields].field[0] = '\0';
 			fields[nfields].op1[0] = '\0';
@@ -142,7 +139,7 @@ void wmi(void)
 								    (!strcmp(op1, "<=") && (a1 <= a2)) ||
 								    (!strcmp(op1, ">") && (a1 > a2)) ||
 								    (!strcmp(op1, ">=") && (a1 >= a2))) {
-									bullet = "green";
+									bullet = green;
 								}
 							} else {
 								int a = strcmp(item, op2);
@@ -152,24 +149,29 @@ void wmi(void)
 								    (!strcmp(op1, ">") && (a > 0)) ||
 								    (!strcmp(op1, ">=") && (a >= 0)) ||
 								    (!strcmp(op1, "contains") && strstr(item, op2))) {
-									bullet = "green";
+									bullet = green;
 								}
 							}
 						} else {
-							bullet = "blue";
+							bullet = blue;
 						}
 					} else {
 						if (op1[0]) {
-							bullet = "red";
+							bullet = red;
 						} else {
-							bullet = "clear";
+							bullet = clear;
 						}
 					}
-					if (bullet == "red") color = bullet;
+					if (bullet == red) color = bullet;
 
+#if 1	/* this messes up the ncv rrd stuff */
 					snprcat(report, sizeof report, "&%s %s: %ls\n",
 						bullet, fields[f].field,
 						szWmiItem?szWmiItem:L"");
+#else
+					snprcat(report, sizeof report, "%s: %ls &%s\n",
+						fields[f].field, szWmiItem?szWmiItem:L"", bullet);
+#endif
 					dhFreeString(szWmiItem);
 				}
 				snprcat(report, sizeof report, "\n");

@@ -1,4 +1,12 @@
 
+081127	procs: list total and unique process count.
+	Released 0.18.1.
+
+081120	Released 0.18.0 with complete support for x64 and wmi.
+
+081118	New module wmi.c allows monitoring anything that is
+	available from wmi.
+
 081113	Display architecture in cpu status page.
 	Changed format of disk status page to not confuse the
 	rrd module do_disk.c in hobbit.

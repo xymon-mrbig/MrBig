@@ -11,7 +11,7 @@ green Tue Jul 06 02:43:47 VS 2004 [ntserver] All processes are OK
 
 //  Forward declarations:
 static BOOL GetProcessList(void);
-static void printError(TCHAR * msg);
+//static void printError(TCHAR * msg);
 
 struct proc {
 	char *name;
@@ -109,7 +109,7 @@ void procs(void)
 	char cfgfile[1024];
 	struct proc *pl;
 	struct cfg *pc;
-	int m, running;
+	int m, running, unique;
 	plist = NULL;
 
 	if (debug > 1) mrlog("procs(%p, %d)", b, n);
@@ -139,16 +139,21 @@ void procs(void)
 		big_free("procs (pc)", pc);
 	}
 	running = 0;
+	unique = 0;
 	while (plist) {
 		pl = plist;
 		plist = pl->next;
+		if (debug > 1) {
+			mrlog("Found %d instances of process '%s'", pl->count, pl->name);
+		}
+		running += pl->count;
+		unique++;
 		big_free("procs (pl->name)", pl->name);
 		big_free("procs (pl)", pl);
-		running++;
 	}
 	b[0] = '\0';
-	snprcat(b, n, "%s\n\n%s\nTotal %d processes running\n",
-		now, q, running);
+	snprcat(b, n, "%s\n\n%s\nTotal %d processes running (%d unique)\n",
+		now, q, running, unique);
 	mrsend(mrmachine, "procs", color, b);
 }
 
@@ -204,6 +209,7 @@ static BOOL GetProcessList(void)
     return TRUE;
 }
 
+#if 0	/* unused */
 static void printError(TCHAR * msg)
 {
 	DWORD eNum;
@@ -226,3 +232,4 @@ static void printError(TCHAR * msg)
 	printf("\n  WARNING: %s failed with error %d (%s)", msg,
 	       (int) eNum, sysMsg);
 }
+#endif
