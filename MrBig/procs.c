@@ -97,8 +97,10 @@ static void store_procname(char *p)
 	pl->count++;
 }
 
-void procs(char *b, int n)
+void procs(void)
 {
+	char b[5000];
+	int n = sizeof b;
 	char p[100], q[5000], *color = "green", *mycolor;
 	char cfgfile[1024];
 	struct proc *pl;
@@ -138,9 +140,9 @@ void procs(char *b, int n)
 		big_free("procs (pl)", pl);
 		running++;
 	}
-	snprintf(b, n,
-		"status %s.procs %s %s\n\n%s\nTotal %d processes running\n",
-		mrmachine, color, now, q, running);
+	snprintf(b, n, "%s\n\n%s\nTotal %d processes running\n",
+		now, q, running);
+	mrsend(mrmachine, "procs", color, b);
 }
 
 

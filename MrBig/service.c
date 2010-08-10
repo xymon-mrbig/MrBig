@@ -10,7 +10,7 @@ VOID  WINAPI ServiceCtrlHandler (DWORD opcode);
 VOID  WINAPI ServiceStart (DWORD argc, LPTSTR *argv); 
 DWORD ServiceInitialization (DWORD argc, LPTSTR *argv, 
         DWORD *specificError); 
-VOID SvcDebugOut(LPSTR String, DWORD Status);
+//VOID SvcDebugOut(LPSTR String, DWORD Status);
 
 void DeleteSampleService(SC_HANDLE schSCManager)
 {
@@ -31,7 +31,7 @@ int delete_service(void)
 {
         SC_HANDLE schSCManager;
 
-SvcDebugOut("delete_service()", 0);
+	startup_log("delete_service()", 0);
 
         // Open a handle to the SC Manager database.
 
@@ -90,7 +90,7 @@ int install_service(void)
 
 	// Open a handle to the SC Manager database. 
  
-SvcDebugOut("install_service()", 0);
+	startup_log("install_service()", 0);
 
 	schSCManager = OpenSCManager( 
 	    NULL,                    // local machine 
@@ -116,23 +116,25 @@ int service_main(int argc, char **argv)
       { NULL,              NULL          } 
    }; 
 
+   startup_log("service_main(%d, %p)", argc, argv);
+
    if (!StartServiceCtrlDispatcher( DispatchTable)) 
    { 
-      SvcDebugOut(" [MY_SERVICE] StartServiceCtrlDispatcher (%d)\n", 
+      	startup_log(" [MY_SERVICE] StartServiceCtrlDispatcher (%d)\n", 
          GetLastError()); 
    } 
    return 0;
 } 
  
-VOID SvcDebugOut(LPSTR String, DWORD Status) 
-{ 
-   char fn[256];
-   strlcpy(fn, "C:\\service.out", sizeof fn);
-   FILE *fp = fopen(fn, "a");
-   if (!fp) return;
-   fprintf(fp, "%s (%ld)\n", String, (long)Status);
-   fclose(fp);
-}
+//VOID SvcDebugOut(LPSTR String, DWORD Status) 
+//{ 
+//   char fn[256];
+//   strlcpy(fn, "D:\\service.out", sizeof fn);
+//   FILE *fp = fopen(fn, "a");
+//   if (!fp) return;
+//   fprintf(fp, "%s (%ld)\n", String, (long)Status);
+//   fclose(fp);
+//}
 
 
 void WINAPI ServiceStart (DWORD argc, LPTSTR *argv) 
@@ -140,6 +142,7 @@ void WINAPI ServiceStart (DWORD argc, LPTSTR *argv)
     DWORD status; 
     DWORD specificError; 
  
+    startup_log("ServiceStart()");
     ServiceStatus.dwServiceType        = SERVICE_WIN32; 
     ServiceStatus.dwCurrentState       = SERVICE_START_PENDING; 
     ServiceStatus.dwControlsAccepted   =
@@ -155,7 +158,7 @@ void WINAPI ServiceStart (DWORD argc, LPTSTR *argv)
  
     if (ServiceStatusHandle == (SERVICE_STATUS_HANDLE)0) 
     { 
-        SvcDebugOut(" [MY_SERVICE] RegisterServiceCtrlHandler failed %d\n", GetLastError()); 
+        startup_log(" [MY_SERVICE] RegisterServiceCtrlHandler failed %d\n", GetLastError()); 
         return; 
     } 
  
@@ -183,11 +186,11 @@ void WINAPI ServiceStart (DWORD argc, LPTSTR *argv)
     if (!SetServiceStatus (ServiceStatusHandle, &ServiceStatus)) 
     { 
         status = GetLastError(); 
-        SvcDebugOut(" [MY_SERVICE] SetServiceStatus error %ld\n",status); 
+        startup_log(" [MY_SERVICE] SetServiceStatus error %ld\n",status); 
     } 
  
     // This is where the service does its work. 
-    SvcDebugOut(" [MY_SERVICE] Returning the Main Thread \n",0); 
+    startup_log(" [MY_SERVICE] Returning the Main Thread \n",0); 
     mrbig();
  
     return; 
@@ -234,11 +237,11 @@ VOID WINAPI ServiceCtrlHandler (DWORD Opcode)
            &ServiceStatus))
          { 
             status = GetLastError(); 
-            SvcDebugOut(" [MY_SERVICE] SetServiceStatus error %ld\n", 
+            startup_log(" [MY_SERVICE] SetServiceStatus error %ld\n", 
                status); 
          } 
  
-         SvcDebugOut(" [MY_SERVICE] Leaving Service \n",0); 
+         startup_log(" [MY_SERVICE] Leaving Service \n",0); 
          return; 
  
       case SERVICE_CONTROL_INTERROGATE: 
@@ -246,7 +249,7 @@ VOID WINAPI ServiceCtrlHandler (DWORD Opcode)
          break; 
  
       default: 
-         SvcDebugOut(" [MY_SERVICE] Unrecognized opcode %ld\n", 
+         startup_log(" [MY_SERVICE] Unrecognized opcode %ld\n", 
              Opcode); 
    } 
  
@@ -254,7 +257,7 @@ VOID WINAPI ServiceCtrlHandler (DWORD Opcode)
    if (!SetServiceStatus (ServiceStatusHandle,  &ServiceStatus)) 
    { 
       status = GetLastError(); 
-      SvcDebugOut(" [MY_SERVICE] SetServiceStatus error %ld\n", 
+      startup_log(" [MY_SERVICE] SetServiceStatus error %ld\n", 
          status); 
    } 
    return; 

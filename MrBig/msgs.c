@@ -118,8 +118,10 @@ licens och hur många licenser som bör köpas.  "
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
 
-void msgs(char *b, int n)
+void msgs(void)
 {
+	char b[5000];
+	int n = sizeof b;
 	char cfgfile[1024];
 	char *mycolor, *color, p[5000];
 	struct event /* *app, *sys, *sec, */ *e;
@@ -237,7 +239,7 @@ struct event *events;
 					achKey, &cbName, NULL,
 					NULL, NULL, &ftLastWriteTime);
 			if (retCode == ERROR_SUCCESS) {
-printf("Reading log %s\n", achKey);
+				if (debug) mrlog("Reading log %s", achKey);
 				events = read_log(achKey, t0-msgage);
 				for (e = events; e && m < 4000; e = e->next) {
 					mycolor = match_rules(e);
@@ -255,9 +257,9 @@ printf("Reading log %s\n", achKey);
 		}
 	}
 #endif
-	snprintf(b, n, "status %s.msgs %s %s\n\n%s\n",
-		mrmachine, color, now, p);
+	snprintf(b, n, "%s\n\n%s\n", now, p);
 
 	free_cfg();
+	mrsend(mrmachine, "msgs", color, b);
 }
 

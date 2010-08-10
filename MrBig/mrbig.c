@@ -305,6 +305,43 @@ int snprcat(char *str, size_t size, const char *fmt, ...)
 	return vsnprintf(str+n, size-n, fmt, ap);
 }
 
+struct gracetime {
+        char *test;
+        time_t grace;
+        struct gracetime *next;
+} *gracetime;
+
+static void insert_grace(char *test, time_t grace)
+{
+        struct gracetime *gt = big_malloc("insert_grace", sizeof *gt);
+        gt->test = big_strdup("insert_grace", test);
+        gt->grace = grace;
+        gt->next = gracetime;
+        gracetime = gt;
+}
+
+static void free_grace(void)
+{
+        struct gracetime *gt;
+
+        while (gracetime) {
+                gt = gracetime;
+                gracetime = gracetime->next;
+                big_free("free_grace", gt->test);
+                big_free("free_grace", gt);
+        }
+}
+
+static time_t lookup_grace(char *test)
+{
+        struct gracetime *gt;
+
+        for (gt = gracetime; gt; gt = gt->next) {
+                if (!strcmp(test, gt->test)) return gt->grace;
+        }
+        return 0;
+}
+
 static void readcfg(void)
 {
 	char b[256], key[256], value[256], *p;
@@ -321,6 +358,7 @@ static void readcfg(void)
 		mrdisplay = mp->next;
 		big_free("readcfg: display", mp);
 	}
+	free_grace();
 	mrsleep = 300;
 	mrloop = INT_MAX;
 	bootyellow = 60;
@@ -385,6 +423,11 @@ static void readcfg(void)
 				strlcpy(pickupdir, value, sizeof pickupdir);
 			} else if (!strcmp(key, "logfile")) {
 				logfp = big_fopen("readcfg:logfile", value, "a");
+			} else if (!strcmp(key, "gracetime")) {
+				char test[1000];
+				int grace = 0;
+				sscanf(value, "%s %d", test, &grace);
+				insert_grace(test, grace);
 			}
 		}
 	}
@@ -425,19 +468,24 @@ void stop_winsock(void)
 struct teststatus {
 	char *machine, *test, *color;
 	time_t last;
+	time_t grace;
 	struct teststatus *next;
 };
 
 static struct teststatus *teststatus = NULL;
 
 /*
-Insert status into list. Return non-zero if color has changed or
-sleep time is exceeded.
+Insert status into list.
+
+Return 0 if color is unchanged and sleep time is not exceeded.
+Return 1 if color is non-green but grace time is not exceeded.
+Return 2 otherwise.
 */
 static int insert_status(char *machine, char *test, char *color)
 {
 	struct teststatus *s;
 	time_t now = time(NULL);
+	time_t grace = lookup_grace(test);
 	if (debug > 1) mrlog("insert_status(%s, %s, %s)", machine, test, color);
 	for (s = teststatus; s; s = s->next) {
 		if (!strcmp(machine, s->machine) &&
@@ -447,39 +495,99 @@ static int insert_status(char *machine, char *test, char *color)
 		}
 	}
 	if (s == NULL) {
+		/* We have never seen this test before.
+		   Allocate a new structure with initial values
+		   and tell mrsend to report the real status to the bbd.
+		*/
 		s = big_malloc("insert_status: node", sizeof *s);
 		s->machine = big_strdup("insert_status: machine", machine);
 		s->test = big_strdup("insert_status: test", test);
-		s->color = NULL;
 		s->next = teststatus;
-		teststatus = s;
-	}
-
-	if (s->color == NULL) {
 		if (debug) mrlog("insert_status: new test");
 		s->color = big_strdup("insert_status: color", color);
 		s->last = now;
-		return 1;
+		s->grace = 0;
+		teststatus = s;
+		return 2;
 	}
-	if (strcmp(color, s->color)) {
-		if (debug) mrlog("insert_status: new color");
+
+	if (!strcmp(color, s->color)) {
+		/* If status is unchanged, check the time.
+		*/
+		if (now < s->last) {
+			/* Someone adjusted the time or something.
+			   Reset and tell mrsend to report the real status.
+			*/
+			mrlog("insert_status: Time has decreased!");
+			s->last = now;
+			s->grace = 0;
+			return 2;
+		}
+		if (now-s->last >= mrsleep) {
+			/* We must send a report or the display will
+			   turn purple.
+			*/
+			if (debug) mrlog("insert_status: mrsleep exceeded");
+			s->last = now;
+			s->grace = 0;
+			return 2;
+		}
+		/* No need to do anything.
+		*/
+		return 0;
+	}
+
+	/* We now know that the current status is different from the
+	   one last reported to the bbd.
+	*/
+
+	if (!strcmp(color, "green")) {
+		/* If the new status is green, insert the new status,
+		   reset gracetime and report the real status.
+		*/
 		big_free("insert_status: color", s->color);
 		s->color = big_strdup("insert_status: color", color);
 		s->last = now;
-		return 1;
-	}
-	if (now < s->last) {
-		mrlog("insert_status: Time has decreased!");
-		s->last = now;
-		return 1;
-	}
-	if (now-s->last >= mrsleep) {
-		if (debug) mrlog("insert_status: mrsleep exceeded");
-		s->last = now;
-		return 1;
+		s->grace = 0;
+		return 2;
 	}
 
-	return 0;
+	if (strcmp(s->color, "green")) {
+		/* If the old status was anything but green, insert
+		   the new status, reset gracetime and report the
+		   real status.
+		*/
+		big_free("insert_status: color", s->color);
+		s->color = big_strdup("insert_status: color", color);
+		s->last = now;
+		s->grace = 0;
+		return 2;
+	}
+
+	/* We now know that the old status was green and the new
+	   status is non-green.
+	*/
+
+	if (s->grace == 0) {
+		/* Start the clock ticking.
+		*/
+		s->grace = now+grace;
+	}
+
+	if (now >= s->grace) {
+		/* Grace time expired, send a real status report.
+		*/
+		big_free("insert_status: color", s->color);
+		s->color = big_strdup("insert_status: color", color);
+		s->last = now;
+		return 2;
+	}
+
+	/* Sit on our hands for a while. Tell mrsend to send a
+	   green status to the bbd.
+	*/
+	s->last = now;
+	return 1;
 }
 
 /*
@@ -490,24 +598,39 @@ and only send something if the colour has changed for this test
 *or* the bbsleep time is exceeded. Then we can run the main loop
 as often as we want without putting any more load on the bbd.
 */
-void mrsend(char *p)
+//void mrsend(char *p)
+void mrsend(char *machine, char *test, char *color, char *message)
 {
 	int m, n, s, x;
 	struct display *mp;
 	struct sockaddr_in my_addr;
-	char machine[200], test[100], color[100];
+//	char machine[200], test[100], color[100];
+	char p[5000];
+	int is;
 
-	if (debug > 1) mrlog("mrsend(%s)", p);
+	if (debug > 1) mrlog("mrsend(%s, %s, %s, %s)", machine, test, color, message);
+#if 0
 	n = sscanf(p, "status %199[^.].%99[^ ] %99s",
 		   machine, test, color);
 	if (n != 3) {
 		mrlog("Bogus string in mrsend, process anyway");
 		if (debug) mrlog("%s", p);
-	} else if (insert_status(machine, test, color) == 0) {
+#endif
+	is = insert_status(machine, test, color);
+	if (is == 0) {
 		if (debug) mrlog("mrsend: no change, nothing to do");
 		return;
 	}
 	if (!start_winsock()) return;
+
+	/* Prepare the report */
+	if (is == 1) {
+		snprintf(p, sizeof p, "status %s.%s green %s",
+			machine, test, message);
+	} else {
+		snprintf(p, sizeof p, "status %s.%s %s %s",
+			machine, test, color, message);
+	}
 
 	for (mp = mrdisplay; mp; mp = mp->next) {
 		s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -524,7 +647,9 @@ void mrsend(char *p)
 			goto Exit;
 		}
 
-		if (debug) mrlog("Using port %d\n", ntohs(mp->in_addr.sin_port));
+		if (debug) mrlog("Using address %s, port %d\n",
+				inet_ntoa(mp->in_addr.sin_addr),
+				ntohs(mp->in_addr.sin_port));
 
 		if (connect(s, (struct sockaddr *)&mp->in_addr, sizeof mp->in_addr)
 				== -1) {
@@ -538,14 +663,14 @@ void mrsend(char *p)
 			m += x;
 		}
 
+		// Wait for 5 seconds if we have another display
+		if (mp->next) {
+			Sleep(5000);
+		}
+
 	Exit:
 		shutdown(s, SD_SEND);
 		closesocket(s);
-
-		// Wait for 10 seconds if we have another display
-		if (mp->next) {
-			Sleep(10000);
-		}
 	}
 }
 
@@ -563,9 +688,31 @@ void mrlog(char *fmt, ...)
 	fflush(fp);
 }
 
+#if 0
+// Use this for logs that need to be written before there is a logfp
+void startup_log(char *fmt, ...)
+{
+	FILE *fp;
+	va_list ap;
+
+	fp = fopen("D:\\mrlog.log", "a");
+	if (!fp) return;
+	va_start(ap, fmt);
+	vfprintf(fp, fmt, ap);
+	va_end(ap);
+	fprintf(fp, "\n");
+	fclose(fp);
+}
+#else
+void startup_log(char *fmt, ...)
+{
+	return;
+}
+#endif
+
 void mrbig(void)
 {
-	char b[5000], *p;
+	char *p;
 	time_t t, lastrun;
 	int sleeptime, i;
 	char hostname[256];
@@ -586,25 +733,25 @@ void mrbig(void)
 			snprcat(now, sizeof now, " [%s]", hostname);
 		}
 
-		cpu(b, sizeof b);
+		cpu(/*b, sizeof b*/);
 check_chunks("after cpu test");
-		mrsend(b);
+//		mrsend(b);
 
-		disk(b, sizeof b);
+		disk(/*b, sizeof b*/);
 check_chunks("after disk test");
-		mrsend(b);
+//		mrsend(b);
 
-		msgs(b, sizeof b);
+		msgs(/*b, sizeof b*/);
 check_chunks("after msgs test");
-		mrsend(b);
+//		mrsend(b);
 
-		procs(b, sizeof b);
+		procs(/*b, sizeof b*/);
 check_chunks("after procs test");
-		mrsend(b);
+//		mrsend(b);
 
-		svcs(b, sizeof b);
+		svcs(/*b, sizeof b*/);
 check_chunks("after svcs test");
-		mrsend(b);
+//		mrsend(b);
 		if (pickupdir[0]) ext_tests();
 
 		lastrun = t;
@@ -633,15 +780,15 @@ int main(int argc, char **argv)
 	int i;
 	char *p;
 
-fprintf(stderr, "main()\n");
+	startup_log("main()");
 	dirsep = '\\';
 	GetModuleFileName(NULL, cfgdir, sizeof cfgdir);
-fprintf(stderr, "cfgdir = '%s'\n", cfgdir);
+	startup_log("cfgdir = '%s'", cfgdir);
 	p = strrchr(cfgdir, dirsep);
 	if (p) *p = '\0';
 	snprintf(cfgfile, sizeof cfgfile,
 		"%s%c%s", cfgdir, dirsep, "mrbig.cfg");
-fprintf(stderr, "cfgfile = '%s'\n", cfgfile);
+	startup_log("cfgfile = '%s'", cfgfile);
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-c")) {
 			i++;
@@ -672,6 +819,7 @@ fprintf(stderr, "cfgfile = '%s'\n", cfgfile);
 		return 0;
 	}
 
+	startup_log("We want to become a service");
 	service_main(argc, argv);
 
 	dump_chunks();

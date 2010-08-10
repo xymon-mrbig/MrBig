@@ -1,4 +1,16 @@
 
+061116	Massive rewrite of mrsend et al to implement grace periods
+	for alarms that shouldn't fire until after som time.
+	New configuration option:
+	gracetime <test> <time>
+	E.g.
+	gracetime cpu 600
+	Released 0.13.0.
+
+061031	Don't sleep in mrsend when nothing has been sent to the bbd.
+	Reduce sleep time to 5 seconds.
+	disk.c: Include alert thresholds in report.
+
 051206	Alarm when memory usage exceeds memred or memyellow percent.
 
 051121	When sending reports to several displays, sleep for 10

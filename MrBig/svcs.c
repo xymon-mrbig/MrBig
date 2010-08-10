@@ -73,8 +73,10 @@ static struct svc *lookup_svcname(char *p)
 }
 
 
-void svcs(char *b, int n)
+void svcs(void)
 {
+	char b[5000];
+	int n = sizeof b;
 	struct svc *pc, *pl;
 	char q[5000];
 	char cfgfile[1024];
@@ -144,7 +146,7 @@ void svcs(char *b, int n)
 			"Can't get service list");
 	}
 	CloseServiceHandle(sc);
-	snprintf(b, n, "status %s.svcs %s %s\n\n%s\n"
+	snprintf(b, n, "%s\n\n%s\n"
 		"Total %d registered services, %d running\n\n"
 		"%d = Not installed\n"
 		"%d = Stopped\n"
@@ -154,10 +156,11 @@ void svcs(char *b, int n)
 		"%d = Continue pending\n"
 		"%d = Pause pending\n"
 		"%d = Paused\n",
-		mrmachine, color, now, q, (int)nsvcs, running,
+		now, q, (int)nsvcs, running,
 		0, SERVICE_STOPPED, SERVICE_START_PENDING,
 		SERVICE_STOP_PENDING, SERVICE_RUNNING,
 		SERVICE_CONTINUE_PENDING, SERVICE_PAUSE_PENDING,
 		SERVICE_PAUSED);
+	mrsend(mrmachine, "svcs", color, b);
 }
 

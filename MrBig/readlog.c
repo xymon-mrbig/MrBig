@@ -81,13 +81,17 @@ static BOOL disp_message(char *log, char *source_name, char *entry_name,
 	char source_module_name[1000];
 	char *pMessage = NULL;
 
-//printf("About to call get_module_from_source(%s, %s, %s, %p)\n",
-//log, source_name, entry_name, source_module_name);
+	if (debug) {
+		mrlog("About to call get_module_from_source(%s, %s, %s, %p)",
+			log, source_name, entry_name, source_module_name);
+	}
 
 	bResult = get_module_from_source(log,
 			source_name, entry_name, source_module_name);
 
-//printf("get_module_from_source returns %d\n", bResult);
+	if (debug) {
+		printf("get_module_from_source returns %d", bResult);
+	}
 
 	if (bResult != ERROR_SUCCESS) {
 		if (debug) mrlog("disp_message: get_module_from_source failed");
@@ -106,23 +110,29 @@ static BOOL disp_message(char *log, char *source_name, char *entry_name,
 		}
 	}
 
-//printf("source_module_name = '%s'\n", source_module_name);
+	if (debug) {
+		mrlog("source_module_name = '%s'", source_module_name);
+	}
 
 	hSourceModule = LoadLibraryEx(source_module_name, NULL,
 		DONT_RESOLVE_DLL_REFERENCES | LOAD_LIBRARY_AS_DATAFILE);
 
-//printf("LoadLibraryEx returns %d\n", hSourceModule);
+	if (debug) {
+		mrlog("LoadLibraryEx returns %d", hSourceModule);
+	}
 
 	if (hSourceModule == NULL) goto Exit;
 
-//printf("About to call FormatMessage(%d, %d, %d, %d, %p, %d, %p)\n",
-//FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_ARGUMENT_ARRAY,
-//hSourceModule,
-//MessageId,
-//MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-//(LPSTR)&pMessage,
-//0,
-//(va_list *)args);
+	if (debug) {
+		mrlog("About to call FormatMessage(%d, %d, %d, %d, %p, %d, %p)",
+			FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_HMODULE | FORMAT_MESSAGE_ARGUMENT_ARRAY,
+			hSourceModule,
+			MessageId,
+			MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+			(LPSTR)&pMessage,
+			0,
+			(va_list *)args);
+	}
 
 	FormatMessage(
 		FORMAT_MESSAGE_ALLOCATE_BUFFER |

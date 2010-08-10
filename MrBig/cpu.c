@@ -133,8 +133,21 @@ static int get_load(int version)
 	return load;
 }
 
-void cpu(char *b, int n)
+static void append_limits(char *a, size_t n)
 {
+	snprcat(a, n, "\nLimits:\n");
+	snprcat(a, n, "Yellow uptime: %d minutes\n", bootyellow);
+	snprcat(a, n, "Red uptime: %d minutes\n", bootred);
+	snprcat(a, n, "Yellow CPU: %d%%\n", cpuyellow);
+	snprcat(a, n, "Red CPU: %d%%\n", cpured);
+	snprcat(a, n, "Yellow RAM: %d%%\n", memyellow);
+	snprcat(a, n, "Red RAM: %d%%\n", memred);
+}
+
+void cpu(void)
+{
+	char b[5000];
+	int n = sizeof b;
 	char r[1000];
 	char up[100];
 	char *color = "green";
@@ -154,9 +167,10 @@ void cpu(char *b, int n)
 	if (!GetVersionEx(&osvi) || osvi.dwPlatformId != VER_PLATFORM_WIN32_NT) {
 		/* Failed, boo hiss */
 		snprintf(b, n,
-			"status %s.cpu red No version info\n"
+			"No version info\n"
 			"%s %s\n",
-			mrmachine, PACKAGE, VERSION);
+			PACKAGE, VERSION);
+		mrsend(mrmachine, "cpu", "red", b);
 		return;
 	}
 
@@ -187,7 +201,7 @@ void cpu(char *b, int n)
 		color = "yellow";
 	}
 	snprintf(b, n,
-		"status %s.cpu %s %s up: %s, %d users, %d procs, load=%d%%, PhysicalMem: %ldMB (%d%%)\n%s\n"
+		"%s up: %s, %d users, %d procs, load=%d%%, PhysicalMem: %ldMB (%d%%)\n%s\n"
 		"Memory Statistics\n"
 		"Total physical memory:         %*.0f bytes\n"
 		"Available physical memory:     %*.0f bytes\n"
@@ -197,7 +211,6 @@ void cpu(char *b, int n)
 		"Available virtual memory size: %*.0f bytes\n\n"
 		"Windows version %d.%d\n"
 		"%s %s\n",
-		mrmachine, color,
 		now, up, uc, pc, load,
 		stat.dwTotalPhys / (1024*1024),
 		(int)memusage,
@@ -210,5 +223,7 @@ void cpu(char *b, int n)
 		WIDTH, (double)stat.dwAvailVirtual,
 		(int)osvi.dwMajorVersion, (int)osvi.dwMinorVersion,
 		PACKAGE, VERSION);
+	append_limits(b, n);
+	mrsend(mrmachine, "cpu", color, b);
 }
 

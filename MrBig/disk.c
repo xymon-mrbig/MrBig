@@ -64,8 +64,25 @@ static void lookup_limits(char *drive, double *yellow, double *red)
 	*red = dfred;
 }
 
-void disk(char *b, int n)
+static void append_limits(char *a, size_t n)
 {
+	struct cfg *pc;
+
+	snprcat(a, n, "\n<b>Limits:</b>\n<table>\n");
+	snprcat(a, n, "<tr><th>Drive</th><th>Yellow</th><th>Red</th></tr>\n");
+	for (pc = pcfg; pc; pc = pc->next) {
+		snprcat(a, n, "<tr><td>%s</td><td>%.1f%%</td><td>%.1f%%</td></tr>\n",
+			pc->name, pc->yellow, pc->red);
+	}
+	snprcat(a, n, "<tr><td>Default</td><td>%.1f%%</td><td>%.1f%%</td></tr>\n",
+		dfyellow, dfred);
+	snprcat(a, n, "</table>\n");
+}
+
+void disk(void)
+{
+	char b[5000];
+	int n = sizeof b;
 	int i, j;
 	double yellow, red;
 	char d[10], p[100], q[5000], r[5000], *color = "green";
@@ -126,7 +143,8 @@ void disk(char *b, int n)
 		}
 		drives >>= 1;
 	}
+	snprintf(b, n, "%s\n\n%s\n%s\n", now, r, q);
+	append_limits(b, n);
 	free_cfg();
-	snprintf(b, n, "status %s.disk %s %s\n\n%s\n%s\n",
-		mrmachine, color, now, r, q);
+	mrsend(mrmachine, "disk", color, b);
 }

@@ -20,6 +20,10 @@ static void pickup_file(char *fn)
 	size_t n;
 
 	snprintf(full_fn, sizeof full_fn, "%s%c%s", pickupdir, dirsep, fn);
+	if (debug) {
+		mrlog("pickup_file(%s)", fn);
+		mrlog("Full path '%s'", full_fn);
+	}
 	fp = big_fopen("pickup_file", full_fn, "r");
 	if (!fp) {
 		mrlog("Can't pick up file");
@@ -40,10 +44,9 @@ static void pickup_file(char *fn)
 
 	*p++ = '\0';
 
-	snprintf(s, sizeof s, "status %s.%s %s %s\n\n%s\n",
-		mrmachine, fn, b, now, p);
+	snprintf(s, sizeof s, "%s\n\n%s\n", now, p);
 
-	mrsend(s);
+	mrsend(mrmachine, fn, b, s);
 	big_fclose("pickup_file", fp);
 	remove(full_fn);
 }
@@ -55,6 +58,12 @@ static void pickup(void)
 	HANDLE hFind;
 
 	snprintf(pattern, sizeof pattern, "%s%c*", pickupdir, dirsep);
+
+	if (debug) {
+		mrlog("pickup()");
+		mrlog("picking up from '%s'", pattern);
+	}
+
 	hFind = FindFirstFile(pattern, &FindFileData);
 
 	if (hFind == INVALID_HANDLE_VALUE) {
