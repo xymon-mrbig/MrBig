@@ -202,14 +202,14 @@ void msgs(void)
 	if (fastmsgs_mode == NULL) fastmsgs_mode = "fastmsgs=auto";
 
 	if (!strcmp(fastmsgs_mode+9, "auto")) {
-		fastfp = fopen(fastmsgsfile, "r");
+		fastfp = big_fopen("msgs", fastmsgsfile, "r");
 		if (fastfp) {
-			fclose(fastfp);
+			big_fclose("msgs", fastfp);
 			fastfile = 1;
 		}
-		fastfp = fopen(fastmsgsfile, "w");
+		fastfp = big_fopen("msgs", fastmsgsfile, "w");
 		fprintf(fastfp, "processing messages; fastfile = %d\n", fastfile);
-		fclose(fastfp);
+		big_fclose("msgs", fastfp);
 	}
 	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
 			TEXT("System\\CurrentControlSet\\Services\\EventLog"),
@@ -253,12 +253,13 @@ void msgs(void)
 				free_log(events);
 			}
 		}
+		RegCloseKey(hTestKey);
 	}
 
 	if (fastfile) {
-		fastfp = fopen(fastmsgsfile, "w");
+		fastfp = big_fopen("msgs", fastmsgsfile, "w");
 		fprintf(fastfp, "done processing messages\n");
-		fclose(fastfp);
+		big_fclose("msgs", fastfp);
 	} else if (!strcmp(fastmsgs_mode+9, "auto")) {
 		remove(fastmsgsfile);
 	}

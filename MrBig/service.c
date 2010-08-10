@@ -126,17 +126,6 @@ int service_main(int argc, char **argv)
    return 0;
 } 
  
-//VOID SvcDebugOut(LPSTR String, DWORD Status) 
-//{ 
-//   char fn[256];
-//   strlcpy(fn, "D:\\service.out", sizeof fn);
-//   FILE *fp = fopen(fn, "a");
-//   if (!fp) return;
-//   fprintf(fp, "%s (%ld)\n", String, (long)Status);
-//   fclose(fp);
-//}
-
-
 void WINAPI ServiceStart (DWORD argc, LPTSTR *argv) 
 { 
     DWORD status; 

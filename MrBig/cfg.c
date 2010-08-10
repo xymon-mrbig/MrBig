@@ -103,7 +103,7 @@ static void recv_cfg(char *host, int port)
 	if (debug > 1) mrlog("Opening cfg.cache");
 
 	failure = 0;
-	fp = fopen("cfg.cache-", "w");
+	fp = big_fopen("recv_cfg", "cfg.cache-", "w");
 	if (fp == NULL) {
 		mrlog("In recv_cfg: can't open cfg.cache- for writing");
 		return;
@@ -112,7 +112,7 @@ static void recv_cfg(char *host, int port)
 	if (!start_winsock()) {
 		mrlog("In recv_cfg: can't start winsock");
 		fprintf(fp, "In recv_cfg: can't start winsock\n");
-		fclose(fp);
+		big_fclose("recv_cfg", fp);
 		return;
 	}
 	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -151,7 +151,7 @@ static void recv_cfg(char *host, int port)
 	}
 Exit:
 	if (debug > 1) mrlog("Closing cfg.cache-");
-	fclose(fp);
+	big_fclose("recv_cfg", fp);
 	if (debug > 1) mrlog("Closing socket");
 	if (closesocket(s) != 0) {
 		mrlog("Error closing socket [%d]", WSAGetLastError());
@@ -173,7 +173,7 @@ void read_cfg(char *cat, char *filename)
 	if (filename == NULL) return;
 
 	if (debug > 1) mrlog("read_cfg(%s, %s)", cat, filename);
-	fp = fopen(filename, "r");
+	fp = big_fopen("read_cfg", filename, "r");
 	if (fp == NULL) return;
 
 	strlcpy(category, cat, sizeof category);
@@ -200,6 +200,6 @@ void read_cfg(char *cat, char *filename)
 			add_cfg(category, b);
 		}
 	}
-	fclose(fp);
+	big_fclose("read_cfg", fp);
 }
 

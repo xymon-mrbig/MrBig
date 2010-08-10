@@ -1,6 +1,10 @@
 
+090116	msgs.c: Close hTestKey after use.
+	Released 0.19.1.
+
 090114	cfg.c: Use cfg.cache- as temporary file when reading configuration.
 	In case of error, write the error to cfg.cache- as well as the log.
+	Released 0.19.0.
 
 090113	mrbig.c: New directive to set options:
 	option [option_name]
