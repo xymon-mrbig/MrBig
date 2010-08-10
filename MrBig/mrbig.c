@@ -2,6 +2,7 @@
 
 #define MEMSIZE 4
 #define PATTERN_SIZE (sizeof big_pattern)
+#define CHUNKS_MAX 10000
 
 static char cfgfile[256];
 char mrmachine[256], bind_addr[256] = "0.0.0.0";
@@ -31,7 +32,7 @@ struct memchunk {
 	void *p;
 	size_t n;
 	char cl[20];
-} chunks[1000];
+} chunks[CHUNKS_MAX];
 
 static unsigned char big_pattern[] = {
 	1,2,3,4,5,6,7,8,9,0, 1,2,3,4,5,6,7,8,9,0,
@@ -98,7 +99,7 @@ static void mrexit(char *reason, int status)
 
 static int check_chunk(int i)
 {
-	unsigned char *q = chunks[i].p+chunks[i].n;
+	unsigned char *q = chunks[i].p+chunks[i].n-PATTERN_SIZE;
 	if (memcmp(q, big_pattern, PATTERN_SIZE)) {
 		mrlog("Chunk %p (%s) has been tampered with",
 			chunks[i].p, chunks[i].cl);
@@ -120,7 +121,7 @@ void check_chunks(char *msg)
 {
 	int i, corrupt = 0;
 	if (debug) mrlog("check_chunks(%s)", msg);
-	for (i = 0; i < 1000; i++) {
+	for (i = 0; i < CHUNKS_MAX; i++) {
 		if (chunks[i].p) {
 			corrupt |= check_chunk(i);
 		}
@@ -139,7 +140,7 @@ static void dump_chunks(void)
 
 	mrlog("Chunks:");
 	n = 0;
-	for (i = 0; i < 1000; i++) {
+	for (i = 0; i < CHUNKS_MAX; i++) {
 		if (chunks[i].p) {
 			mrlog("%d: '%s' (%p) %ld bytes", i,
 				chunks[i].cl, chunks[i].p, (long)chunks[i].n);
@@ -155,18 +156,21 @@ static void store_chunk(void *p, size_t n, char *cl)
 
 	if (!debug_memory) return;
 
-	for (i = 0; i < 1000; i++)
+	for (i = 0; i < CHUNKS_MAX; i++)
 		if (chunks[i].p == NULL) break;
-	if (i == 1000) {
+	if (i == CHUNKS_MAX) {
 		mrlog("No empty chunk slot for %p (%s), exiting", p, cl);
 		dump_chunks();
 		mrexit("store_chunk is out of slots", EXIT_FAILURE);
 	}
-	if (debug >= 3) mrlog("Storing chunk %p (%s) in slot %d", p, cl, i);
+	if (debug >= 3) mrlog("Storing chunk %p (%s) of %ld bytes in slot %d",
+				p, cl, (long)n, i);
 	chunks[i].p = p;
 	chunks[i].n = n;
+mrlog("In store_chunk: i = %d", i);
 	strlcpy(chunks[i].cl, cl, 20);
-	memcpy(p+n, big_pattern, PATTERN_SIZE);
+mrlog("In store_chunk: i = %d", i);
+	memcpy(p+n-PATTERN_SIZE, big_pattern, PATTERN_SIZE);
 }
 
 static void remove_chunk(void *p, char *cl)
@@ -175,9 +179,9 @@ static void remove_chunk(void *p, char *cl)
 
 	if (!debug_memory) return;
 
-	for (i = 0; i < 1000; i++)
+	for (i = 0; i < CHUNKS_MAX; i++)
 		if (chunks[i].p == p) break;
-	if (i == 1000) {
+	if (i == CHUNKS_MAX) {
 		mrlog("Can't find chunk %p (%s)", p, cl);
 		dump_chunks();
 		mrlog("Continuing even though I can't find chunk %p (%s)",
@@ -196,10 +200,14 @@ void *big_malloc(char *p, size_t n)
 	void *a;
 	size_t m;
 
-	if (debug_memory) m = memsize*(n+PATTERN_SIZE);
-	else m = memsize*n;
+	if (debug_memory) {
+		mrlog("big_malloc(%s, %ld)", p, (long)n);
+		m = memsize*(n+PATTERN_SIZE);
+	} else {
+		m = memsize*n;
+	}
 
-	a = malloc(memsize*n);
+	a = malloc(m);
 
 	if (debug > 2) {
 		mrlog("Allocating %ld bytes (%p) on behalf of %s",
@@ -218,12 +226,15 @@ void *big_realloc(char *p, void *q, size_t n)
 	void *a;
 	size_t m;
 
-	if (debug_memory) m = memsize*(n+PATTERN_SIZE);
-	else m = memsize*n;
+	if (debug_memory) {
+		mrlog("big_realloc(%s, %p, %ld)", p, q, n);
+		m = memsize*(n+PATTERN_SIZE);
+	} else {
+		m = memsize*n;
+	}
 
 	remove_chunk(q, p);
-	if (debug_memory) a = realloc(q, m);
-	else a = realloc(q, m);
+	a = realloc(q, m);
 
 	if (debug > 2) {
 		mrlog("Reallocating %ld bytes (%p => %p) on behalf of %s",	

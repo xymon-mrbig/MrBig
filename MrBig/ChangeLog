@@ -1,4 +1,7 @@
 
+080122	Fixed a bug in the memory debugging code.
+	Released 0.16.1.
+
 071211	Added new filtering rule for messages: perform action based on
 	log name. Example:
 	ignore log Application
