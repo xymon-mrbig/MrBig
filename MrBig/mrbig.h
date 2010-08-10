@@ -16,7 +16,7 @@
 #include <ctype.h>
 
 /* Never sleep for less than 30 seconds */
-#define SLEEP_MIN (30)
+#define SLEEP_MIN (10)
 
 /* from readperf.c */
 struct perfcounter {
@@ -50,6 +50,7 @@ extern char pickupdir[256];
 //extern int mrsleep;
 extern int bootyellow, bootred;
 extern double dfyellow, dfred;
+extern int memyellow, memred;
 extern int dirsep;
 extern int msgage;
 extern int cpuyellow, cpured;

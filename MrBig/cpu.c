@@ -128,6 +128,8 @@ static int get_load(int version)
 	time0 = time1;
 	proc0 = proc1;
 	free_perfcounters(perfc);
+	// sanity check
+	if (load < 0) load = 0;
 	return load;
 }
 
@@ -179,6 +181,11 @@ void cpu(char *b, int n)
 		color = "yellow";
 	}
 	memusage = 100-stat.dwAvailPhys/(stat.dwTotalPhys/100);
+	if (memusage > memred) {
+		color = "red";
+	} else if (memusage > memyellow && !strcmp(color, "green")) {
+		color = "yellow";
+	}
 	snprintf(b, n,
 		"status %s.cpu %s %s up: %s, %d users, %d procs, load=%d%%, PhysicalMem: %ldMB (%d%%)\n%s\n"
 		"Memory Statistics\n"

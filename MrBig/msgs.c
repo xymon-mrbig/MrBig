@@ -115,12 +115,37 @@ NT Server. Se Administrationsverktyg, Licenshanteraren för mer information om vi
 licens och hur många licenser som bör köpas.  "
 */
 
+#define MAX_KEY_LENGTH 255
+#define MAX_VALUE_NAME 16383
+
 void msgs(char *b, int n)
 {
 	char cfgfile[1024];
 	char *mycolor, *color, p[5000];
-	struct event *app, *sys, *sec, *e;
+	struct event /* *app, *sys, *sec, */ *e;
+//struct event *ulric_fibbar;
+struct event *events;
 	int m;
+
+	HKEY hTestKey;
+    	TCHAR    achKey[MAX_KEY_LENGTH+1];   // buffer for subkey name
+    	DWORD    cbName;                   // size of name string
+    	TCHAR    achClass[MAX_PATH] = TEXT("");  // buffer for class name
+    	DWORD    cchClassName = MAX_PATH;  // size of class string
+    	DWORD    cSubKeys=0;               // number of subkeys
+    	DWORD    cbMaxSubKey;              // longest subkey size
+    	DWORD    cchMaxClass;              // longest class string
+    	DWORD    cValues;              // number of values for key
+    	DWORD    cchMaxValue;          // longest value name
+    	DWORD    cbMaxValueData;       // longest value data
+    	DWORD    cbSecurityDescriptor; // size of security descriptor
+    	FILETIME ftLastWriteTime;      // last write time
+
+    	DWORD i, retCode;
+
+    	TCHAR  achValue[MAX_VALUE_NAME+1];
+    	DWORD cchValue = MAX_VALUE_NAME;
+
 
 	if (debug > 1) mrlog("msgs(%p, %d)", b, n);
 	snprintf(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "msgs.cfg");
@@ -133,6 +158,7 @@ void msgs(char *b, int n)
 	color = "green";
 	p[0] = '\0';
 	m = 0;
+#if 0
 	app = read_log("Application", t0-msgage);
 	for (e = app; e != NULL && m < 4000; e = e->next) {
 		mycolor = match_rules(e);
@@ -151,7 +177,7 @@ void msgs(char *b, int n)
 		mycolor = match_rules(e);
 		if (mycolor) {
 			sanitize_message(e->message);
-			snprcat(p, sizeof p, "&%s Application - %s - %s%s\n",
+			snprcat(p, sizeof p, "&%s System - %s - %s%s\n",
 				mycolor, e->source,
 				ctime(&e->gtime), e->message);
 			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
@@ -164,7 +190,7 @@ void msgs(char *b, int n)
 		mycolor = match_rules(e);
 		if (mycolor) {
 			sanitize_message(e->message);
-			snprcat(p, sizeof p, "&%s Application - %s - %s%s\n",
+			snprcat(p, sizeof p, "&%s Security - %s - %s%s\n",
 				mycolor, e->source,
 				ctime(&e->gtime), e->message);
 			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
@@ -172,8 +198,66 @@ void msgs(char *b, int n)
 		}
 	}
 	free_log(sec);
+	ulric_fibbar = read_log("File Replication Service", t0-msgage);
+	for (e = ulric_fibbar; e != NULL && m < 4000; e = e->next) {
+		mycolor = match_rules(e);
+		if (mycolor) {
+			sanitize_message(e->message);
+			snprcat(p, sizeof p, "&%s File Replication Service - %s - %s%s\n",
+				mycolor, e->source,
+				ctime(&e->gtime), e->message);
+			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
+				color = mycolor;
+		}
+	}
+	free_log(ulric_fibbar);
+#else
+	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
+			TEXT("System\\CurrentControlSet\\Services\\EventLog"),
+			0,
+			KEY_READ,
+			&hTestKey) == ERROR_SUCCESS) {
+		retCode = RegQueryInfoKey(
+		        hTestKey,                    // key handle
+		        achClass,                // buffer for class name
+		        &cchClassName,           // size of class string
+		        NULL,                    // reserved
+		        &cSubKeys,               // number of subkeys
+		        &cbMaxSubKey,            // longest subkey size
+		        &cchMaxClass,            // longest class string
+		        &cValues,                // number of values for this key
+		        &cchMaxValue,            // longest value name
+		        &cbMaxValueData,         // longest value data
+		        &cbSecurityDescriptor,   // security descriptor
+		        &ftLastWriteTime);       // last write time
+
+		for (i = 0; i < cSubKeys; i++) {
+			cbName = MAX_KEY_LENGTH;
+			retCode = RegEnumKeyEx(hTestKey, i,
+					achKey, &cbName, NULL,
+					NULL, NULL, &ftLastWriteTime);
+			if (retCode == ERROR_SUCCESS) {
+printf("Reading log %s\n", achKey);
+				events = read_log(achKey, t0-msgage);
+				for (e = events; e && m < 4000; e = e->next) {
+					mycolor = match_rules(e);
+					if (mycolor) {
+						sanitize_message(e->message);
+						snprcat(p, sizeof p, "&%s %s - %s - %s%s\n",
+							mycolor, achKey, e->source,
+							ctime(&e->gtime), e->message);
+						if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
+							color = mycolor;
+					}
+				}
+				free_log(events);
+			}
+		}
+	}
+#endif
 	snprintf(b, n, "status %s.msgs %s %s\n\n%s\n",
 		mrmachine, color, now, p);
 
 	free_cfg();
 }
+

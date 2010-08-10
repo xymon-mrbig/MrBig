@@ -14,6 +14,7 @@ static int mrport, mrsleep, mrloop;
 int bootyellow, bootred;
 double dfyellow, dfred;
 int cpuyellow, cpured;
+int memyellow, memred;
 int debug = 0;
 int dirsep;
 int msgage;
@@ -328,6 +329,8 @@ static void readcfg(void)
 	dfred = 95;
 	cpuyellow = 80;
 	cpured = 90;
+	memyellow = 100;
+	memred = 100;
 	msgage = 3600;
 	pickupdir[0] = '\0';
 	if (logfp) big_fclose("readcfg:logfile", logfp);
@@ -370,6 +373,10 @@ static void readcfg(void)
 				dfyellow = atof(value);
 			} else if (!strcmp(key, "dfred")) {
 				dfred = atof(value);
+			} else if (!strcmp(key, "memyellow")) {
+				memyellow = atof(value);
+			} else if (!strcmp(key, "memred")) {
+				memred = atof(value);
 			} else if (!strcmp(key, "cfgdir")) {
 				strlcpy(cfgdir, value, sizeof cfgdir);
 			} else if (!strcmp(key, "msgage")) {

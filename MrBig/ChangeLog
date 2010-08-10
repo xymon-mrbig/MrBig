@@ -1,4 +1,6 @@
 
+051206	Alarm when memory usage exceeds memred or memyellow percent.
+
 051121	When sending reports to several displays, sleep for 10
 	seconds between each.
 	Released 0.10.0.
