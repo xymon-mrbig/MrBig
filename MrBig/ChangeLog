@@ -1,4 +1,12 @@
 
+081113	Display architecture in cpu status page.
+	Changed format of disk status page to not confuse the
+	rrd module do_disk.c in hobbit.
+
+081112	Multi-architecture build environment.
+
+081110	Beta release of native 64-bit version.
+
 081106	In procs.c: allow process names in double quotes, e.g.
 	"Ulric fibbar.exe" 1 2
 	Released 0.17.0

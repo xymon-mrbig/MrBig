@@ -2,6 +2,16 @@
 
 #define WIDTH 15
 
+#if defined (_M_IA64)
+#define CPU "Itanium"
+#elif defined (_M_IX86)
+#define CPU "x86"
+#elif defined (_M_X64)
+#define CPU "x64"
+#else
+#define CPU "unknown"
+#endif
+
 /* cpu
 
 green Tue Jul 06 02:43:47 VS 2004 [ntserver] up: 3 days, 1 users, 16 procs, load=1%, PhysicalMem: 64MB(53%)
@@ -170,8 +180,8 @@ void cpu(void)
 		b[0] = '\0';
 		snprcat(b, n,
 			"No version info\n"
-			"%s %s\n",
-			PACKAGE, VERSION);
+			"%s %s (%s)\n",
+			PACKAGE, VERSION, CPU);
 		mrsend(mrmachine, "cpu", "red", b);
 		return;
 	}
@@ -220,7 +230,7 @@ void cpu(void)
 		"Total virtual memory:          %*.0f bytes\n"
 		"Available virtual memory size: %*.0f bytes\n\n"
 		"Windows version %d.%d\n"
-		"%s %s\n",
+		"%s %s (%s)\n",
 		now, up, uc, pc, load,
 		(long)(statex.ullTotalPhys / (1024*1024)),
 		(int)memusage,
@@ -241,7 +251,7 @@ void cpu(void)
 		WIDTH, (double)statex.ullAvailVirtual,
 #endif
 		(int)osvi.dwMajorVersion, (int)osvi.dwMinorVersion,
-		PACKAGE, VERSION);
+		PACKAGE, VERSION, CPU);
 	append_limits(b, n);
 	mrsend(mrmachine, "cpu", color, b);
 }

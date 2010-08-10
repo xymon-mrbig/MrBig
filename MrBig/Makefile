@@ -1,7 +1,6 @@
 
-CC=/cygdrive/d/MinGW/bin/gcc.exe
 PACKAGE=MrBig
-VERSION=0.17.0
+VERSION=0.17.1
 #CFLAGS=-Wall -O -g -DDEBUG
 CFLAGS=-Wall -O3 -g -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 DOCS=INSTALL EVENTS ChangeLog TODO EXT LARRD logs.cmd testfile.txt
@@ -19,14 +18,20 @@ DISTCFG=mrbig.cfg.dist mrbig.cfg.minicfg
 DISTDIR=$(PACKAGE)-$(VERSION)
 EXTRA_DIST=minicfg.c minibbd.c
 DISTFILES=$(CFG) $(DISTCFG) $(SRCS) $(HDRS) $(DOCS) Makefile $(EXTRA_DIST)
-ZIPFILES=$(DISTCFG) $(DOCS) mrbig.exe
+ZIPFILES=$(DISTCFG) $(DOCS)
+EXEFILES=X86/mrbig.exe X64/mrbig64.exe
 ARCHIVE=ulric@tiffany.365-24.se:/usr/local/apache/vhosts/extranet.365-24.se/MrBig/Archive
 BETAVERSION=`date +%y%m%d%H%M`
 
-all: mrbig.exe
+all:
+	make -C X86 mrbig.exe
+	make -C X64 mrbig64.exe
 
 mrbig.exe: $(OBJS)
 	$(CC) -o mrbig.exe $(OBJS) -lws2_32 -lpsapi
+
+mrbig64.exe: $(OBJS)
+	$(CC) -o mrbig64.exe $(OBJS) -lws2_32 -lpsapi
 
 mrbignt.exe: $(NTOBJS)
 	$(CC) -o mrbignt.exe $(NTOBJS) -lws2_32 -lpsapi
@@ -76,47 +81,33 @@ start:
 	net start mrbig
 
 clean:
+	make -C X86 .clean
+	make -C X64 .clean
+	make .clean
+
+.clean:
 	rm -f *.o *.exe *~ *.stackdump
 
-# This is not a very good idea
-#mrbig.cfg.dist: mrbig.cfg
-#	todos < mrbig.cfg > mrbig.cfg.dist
-#	#cp mrbig.cfg mrbig.cfg.dist
+#zip: $(ZIPFILES)
+#	strip mrbig.exe
+#	zip $(PACKAGE)-$(VERSION).zip $(ZIPFILES)
 #
-#procs.cfg.dist: procs.cfg
-#	todos < procs.cfg > procs.cfg.dist
-#	#cp procs.cfg procs.cfg.dist
-#
-#services.cfg.dist: services.cfg
-#	todos < services.cfg > services.cfg.dist
-#	#cp services.cfg services.cfg.dist
-#
-#msgs.cfg.dist: msgs.cfg
-#	todos < msgs.cfg > msgs.cfg.dist
-#	#cp msgs.cfg msgs.cfg.dist
-#
-#ext.cfg.dist: ext.cfg
-#	todos < ext.cfg > ext.cfg.dist
-#	#cp ext.cfg ext.cfg.dist
-#
-#disk.cfg.dist: disk.cfg
-#	todos < disk.cfg > disk.cfg.dist
-#	#cp disk.cfg disk.cfg.dist
 
-zip: $(ZIPFILES)
-	strip mrbig.exe
-	zip $(PACKAGE)-$(VERSION).zip $(ZIPFILES)
+zip: $(ZIPFILES) all
+	zip $(PACKAGE)-$(VERSION).zip $(ZIPFILES) $(EXEFILES)
 
 dist: $(DISTFILES)
 	rm -rf $(DISTDIR)
-	mkdir $(DISTDIR)
+	mkdir $(DISTDIR) $(DISTDIR)/X86 $(DISTDIR)/X64
 	cp $(DISTFILES) $(DISTDIR)
+	cp X86/Makefile $(DISTDIR)/X86
+	cp X64/Makefile $(DISTDIR)/X64
 	tar cf $(DISTDIR).tar $(DISTDIR)
 	gzip -f $(DISTDIR).tar
 	rm -rf $(DISTDIR)
 
 upload: zip dist
-	scp mrbig.exe $(PACKAGE)-$(VERSION).zip $(ARCHIVE)/Binaries
+	scp $(EXEFILES) $(PACKAGE)-$(VERSION).zip $(ARCHIVE)/Binaries
 	scp $(DISTDIR).tar.gz $(ARCHIVE)/Sources
 
 beta:

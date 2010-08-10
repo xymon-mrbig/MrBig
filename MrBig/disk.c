@@ -68,6 +68,7 @@ static void append_limits(char *a, size_t n)
 {
 	struct cfg *pc;
 
+#if 0	/* this upsets Hobbit's rrd handler module do_disk.c */
 	snprcat(a, n, "\n<b>Limits:</b>\n<table>\n");
 	snprcat(a, n, "<tr><th>Drive</th><th>Yellow</th><th>Red</th></tr>\n");
 	for (pc = pcfg; pc; pc = pc->next) {
@@ -77,6 +78,14 @@ static void append_limits(char *a, size_t n)
 	snprcat(a, n, "<tr><td>Default</td><td>%.1f%%</td><td>%.1f%%</td></tr>\n",
 		dfyellow, dfred);
 	snprcat(a, n, "</table>\n");
+#else	/* fixed width plain text should be safe */
+	snprcat(a, n, "\nLimits:\n");
+	snprcat(a, n, "%-10s %-10s %-10s\n", "Drive", "Yellow", "Red");
+	for (pc = pcfg; pc; pc = pc->next) {
+		snprcat(a, n, "%-10s %-10.1f %-10.1f\n", pc->name, pc->yellow, pc->red);
+	}
+	snprcat(a, n, "%-10s %-10.1f %-10.1f\n", "Default", dfyellow, dfred);
+#endif
 }
 
 void disk(void)
