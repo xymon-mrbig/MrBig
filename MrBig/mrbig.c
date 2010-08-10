@@ -517,6 +517,8 @@ void mrsend(char *p)
 			goto Exit;
 		}
 
+		if (debug) mrlog("Using port %d\n", ntohs(mp->in_addr.sin_port));
+
 		if (connect(s, (struct sockaddr *)&mp->in_addr, sizeof mp->in_addr)
 				== -1) {
 			mrlog("Can't connect");
@@ -532,6 +534,11 @@ void mrsend(char *p)
 	Exit:
 		shutdown(s, SD_SEND);
 		closesocket(s);
+
+		// Wait for 10 seconds if we have another display
+		if (mp->next) {
+			Sleep(10000);
+		}
 	}
 }
 

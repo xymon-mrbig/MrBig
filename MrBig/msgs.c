@@ -159,19 +159,19 @@ void msgs(char *b, int n)
 		}
 	}
 	free_log(sys);
-//	sec = read_log("Security", t0-msgage);
-//	for (e = sec; e != NULL && m < 4000; e = e->next) {
-//		mycolor = match_rules(e);
-//		if (mycolor) {
-//			sanitize_message(e->message);
-//			snprcat(p, sizeof p, "&%s Application - %s - %s%s\n",
-//				mycolor, e->source,
-//				ctime(&e->gtime), e->message);
-//			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
-//				color = mycolor;
-//		}
-//	}
-//	free_log(sec);
+	sec = read_log("Security", t0-msgage);
+	for (e = sec; e != NULL && m < 4000; e = e->next) {
+		mycolor = match_rules(e);
+		if (mycolor) {
+			sanitize_message(e->message);
+			snprcat(p, sizeof p, "&%s Application - %s - %s%s\n",
+				mycolor, e->source,
+				ctime(&e->gtime), e->message);
+			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
+				color = mycolor;
+		}
+	}
+	free_log(sec);
 	snprintf(b, n, "status %s.msgs %s %s\n\n%s\n",
 		mrmachine, color, now, p);
 

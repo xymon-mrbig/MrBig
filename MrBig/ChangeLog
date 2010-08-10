@@ -1,4 +1,8 @@
 
+051121	When sending reports to several displays, sleep for 10
+	seconds between each.
+	Released 0.10.0.
+
 051111	Terminate each report with \n\0 rather than \n. This is
 	what Quest's client does.
 
