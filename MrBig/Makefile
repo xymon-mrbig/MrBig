@@ -1,7 +1,7 @@
 
 CC=/cygdrive/d/MinGW/bin/gcc.exe
 PACKAGE=MrBig
-VERSION=0.13.0
+VERSION=0.13.4
 #CFLAGS=-Wall -O -g -DDEBUG
 CFLAGS=-Wall -O3 -g -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 DOCS=INSTALL EVENTS ChangeLog TODO EXT LARRD logs.cmd testfile.txt
@@ -20,6 +20,7 @@ DISTDIR=$(PACKAGE)-$(VERSION)
 EXTRA_DIST=minicfg.c minibbd.c
 DISTFILES=$(CFG) $(DISTCFG) $(SRCS) $(HDRS) $(DOCS) Makefile $(EXTRA_DIST)
 ZIPFILES=$(DISTCFG) $(DOCS) mrbig.exe
+ARCHIVE=ulric@tiffany.365-24.se:/usr/local/apache/vhosts/extranet.365-24.se/MrBig/Archive
 
 all: mrbig.exe
 
@@ -106,3 +107,11 @@ dist: $(DISTFILES)
 	tar cf $(DISTDIR).tar $(DISTDIR)
 	gzip -f $(DISTDIR).tar
 	rm -rf $(DISTDIR)
+
+upload: zip dist
+	scp mrbig.exe $(PACKAGE)-$(VERSION).zip $(ARCHIVE)/Binaries
+	scp $(DISTDIR).tar.gz $(ARCHIVE)/Sources
+
+beta: clean all
+	scp mrbig.exe $(ARCHIVE)/Beta/mrbig-$(VERSION)-beta.exe
+

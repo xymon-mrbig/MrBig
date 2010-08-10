@@ -50,6 +50,50 @@ static unsigned char big_pattern[] = {
 
 #define PATTERN_SIZE (sizeof big_pattern)
 
+void mrlog(char *fmt, ...)
+{
+	FILE *fp;
+	va_list ap;
+	if (standalone) fp = stderr;
+	else fp = logfp;
+	if (!fp) return;
+	va_start(ap, fmt);
+	vfprintf(fp, fmt, ap);
+	va_end(ap);
+	fprintf(fp, "\n");
+	fflush(fp);
+}
+
+#if 1
+// Use this for logs that need to be written before there is a logfp
+void startup_log(char *fmt, ...)
+{
+	FILE *fp;
+	va_list ap;
+
+	fp = fopen("mrlog.log", "a");
+	if (!fp) return;
+	va_start(ap, fmt);
+	vfprintf(fp, fmt, ap);
+	va_end(ap);
+	fprintf(fp, "\n");
+	fclose(fp);
+}
+#else
+void startup_log(char *fmt, ...)
+{
+	return;
+}
+#endif
+
+static void mrexit(char *reason, int status)
+{
+	mrlog("mrexit(%s, %d)", reason, status);
+	startup_log("mrexit(%s, %d)", reason, status);
+	if (logfp) fclose(logfp);
+	exit(status);
+}
+
 static int check_chunk(int i)
 {
 	unsigned char *q = chunks[i].p+chunks[i].n;
@@ -81,7 +125,7 @@ void check_chunks(char *msg)
 	}
 	if (corrupt) {
 		mrlog("Memory corruption detected");
-		exit(EXIT_FAILURE);
+		mrexit("check_chunks found memory corruption", EXIT_FAILURE);
 	} else {
 		if (debug) mrlog("Memory checks out OK");
 	}
@@ -114,7 +158,7 @@ static void store_chunk(void *p, size_t n, char *cl)
 	if (i == 1000) {
 		mrlog("No empty chunk slot for %p (%s), exiting", p, cl);
 		dump_chunks();
-		exit(EXIT_FAILURE);
+		mrexit("store_chunk is out of slots", EXIT_FAILURE);
 	}
 	if (debug >= 3) mrlog("Storing chunk %p (%s) in slot %d", p, cl, i);
 	chunks[i].p = p;
@@ -132,11 +176,12 @@ static void remove_chunk(void *p, char *cl)
 	for (i = 0; i < 1000; i++)
 		if (chunks[i].p == p) break;
 	if (i == 1000) {
-		mrlog("Can't find chunk %p (%s), exiting", p, cl);
+		mrlog("Can't find chunk %p (%s)", p, cl);
 		dump_chunks();
-		exit(EXIT_FAILURE);
+		mrlog("Continuing even though I can't find chunk %p (%s)",
+			p, cl);
 	}
-	if (check_chunk(i)) exit(EXIT_FAILURE);
+	if (check_chunk(i)) mrexit("remove_chunk: check not ok", EXIT_FAILURE);
 	if (debug >= 3) {
 		mrlog("Removing chunk %p (%s) from slot %d",
 			p, chunks[i].cl, i);
@@ -157,7 +202,7 @@ void *big_malloc(char *p, size_t n)
 	}
 	if (a == NULL) {
 		mrlog("Allocation '%s' failed, exiting", p);
-		exit(EXIT_FAILURE);
+		mrexit("Out of memory", EXIT_FAILURE);
 	}
 	store_chunk(a, n, p);
 	return a;
@@ -177,7 +222,7 @@ void *big_realloc(char *p, void *q, size_t n)
 
 	if (a == NULL) {
 		mrlog("Allocation '%s' failed, exiting", p);
-		exit(EXIT_FAILURE);
+		mrexit("Out of memory", EXIT_FAILURE);
 	}
 	store_chunk(a, n, p);
 	return a;
@@ -226,15 +271,17 @@ static void store_file(FILE *p, char *cl)
 	int i;
 
 	if (debug < 2) return;
+	mrlog("store_file(%p, %s)", p, cl);
 
 	for (i = 0; i < 100; i++)
 		if (files[i].p == NULL) break;
 	if (i == 100) {
 		mrlog("No empty files slot, exiting");
 		dump_files();
-		exit(EXIT_FAILURE);
+		mrexit("Out of file slots", EXIT_FAILURE);
 	}
 	mrlog("Storing file %p (%s) in slot %d", p, cl, i);
+	dump_files();
 	files[i].p = p;
 	strlcpy(files[i].cl, cl, 20);
 }
@@ -245,14 +292,16 @@ static void remove_file(FILE *p)
 
 	if (debug < 2) return;
 
+	mrlog("remove_file(%p)", p);
 	for (i = 0; i < 100; i++)
 		if (files[i].p == p) break;
 	if (i == 100) {
 		mrlog("Can't find file, exiting");
 		dump_files();
-		exit(EXIT_FAILURE);
+		mrlog("Continuing even though I can't find file %p", p);
 	}
 	mrlog("Removing file %p (%s) from slot %d", p, files[i].cl, i);
+	dump_files();
 	files[i].p = NULL;
 }
 
@@ -403,6 +452,8 @@ static void readcfg(void)
 				bootyellow = atoi(value);
 			} else if (!strcmp(key, "bootred")) {
 				bootred = atoi(value);
+			} else if (!strcmp(key, "debug")) {
+				debug = atoi(value);
 			} else if (!strcmp(key, "cpuyellow")) {
 				cpuyellow = atoi(value);
 			} else if (!strcmp(key, "cpured")) {
@@ -448,11 +499,13 @@ int start_winsock(void)
 {
 	int n;
 
+	if (debug > 1) mrlog("start_winsock()");
 	if (!ws_started) {
 		n = WSAStartup(MAKEWORD(2, 2), &wsaData);
 		if (n != NO_ERROR) {
-			mrlog("Error at WSAStartup()");
+			mrlog("Error at WSAStartup() [%d]", WSAGetLastError());
 		} else {
+			if (debug) mrlog("Winsock started");
 			ws_started = 1;
 		}
 	}
@@ -635,7 +688,7 @@ void mrsend(char *machine, char *test, char *color, char *message)
 	for (mp = mrdisplay; mp; mp = mp->next) {
 		s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 		if (s == -1) {
-			mrlog("No socket for you!");
+			mrlog("No socket for you! [%d]", WSAGetLastError());
 			goto Exit;
 		}
 		memset(&my_addr, 0, sizeof my_addr);
@@ -643,7 +696,8 @@ void mrsend(char *machine, char *test, char *color, char *message)
 		my_addr.sin_port = 0;
 		my_addr.sin_addr.s_addr = inet_addr(bind_addr);
 		if (bind(s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
-			mrlog("In mrsend: can't bind local address %s", bind_addr);
+			mrlog("In mrsend: can't bind local address %s [%d]",
+				bind_addr, WSAGetLastError());
 			goto Exit;
 		}
 
@@ -653,7 +707,7 @@ void mrsend(char *machine, char *test, char *color, char *message)
 
 		if (connect(s, (struct sockaddr *)&mp->in_addr, sizeof mp->in_addr)
 				== -1) {
-			mrlog("Can't connect");
+			mrlog("Can't connect [%d]", WSAGetLastError());
 			goto Exit;
 		}
 
@@ -669,46 +723,15 @@ void mrsend(char *machine, char *test, char *color, char *message)
 		}
 
 	Exit:
-		shutdown(s, SD_SEND);
-		closesocket(s);
+		if (shutdown(s, SD_SEND) != 0) {
+			mrlog("Error shutting down socket [%d]",
+				WSAGetLastError());
+		}
+		if (closesocket(s) != 0) {
+			mrlog("Error closing socket [%d]", WSAGetLastError());
+		}
 	}
 }
-
-void mrlog(char *fmt, ...)
-{
-	FILE *fp;
-	va_list ap;
-	if (standalone) fp = stderr;
-	else fp = logfp;
-	if (!fp) return;
-	va_start(ap, fmt);
-	vfprintf(fp, fmt, ap);
-	va_end(ap);
-	fprintf(fp, "\n");
-	fflush(fp);
-}
-
-#if 0
-// Use this for logs that need to be written before there is a logfp
-void startup_log(char *fmt, ...)
-{
-	FILE *fp;
-	va_list ap;
-
-	fp = fopen("D:\\mrlog.log", "a");
-	if (!fp) return;
-	va_start(ap, fmt);
-	vfprintf(fp, fmt, ap);
-	va_end(ap);
-	fprintf(fp, "\n");
-	fclose(fp);
-}
-#else
-void startup_log(char *fmt, ...)
-{
-	return;
-}
-#endif
 
 void mrbig(void)
 {
@@ -718,6 +741,12 @@ void mrbig(void)
 	char hostname[256];
 	DWORD hostsize;
 
+	if (debug) {
+		mrlog("mrbig()");
+	}
+	for (i = 0; _environ[i]; i++) {
+		startup_log("%s", _environ[i]);
+	}
 	for (;;) {
 		if (debug) mrlog("main loop");
 		read_cfg("mrbig", cfgfile);
@@ -789,6 +818,8 @@ int main(int argc, char **argv)
 	snprintf(cfgfile, sizeof cfgfile,
 		"%s%c%s", cfgdir, dirsep, "mrbig.cfg");
 	startup_log("cfgfile = '%s'", cfgfile);
+	startup_log("SystemRoot = '%s'", getenv("SystemRoot"));
+
 	for (i = 1; i < argc; i++) {
 		if (!strcmp(argv[i], "-c")) {
 			i++;

@@ -53,3 +53,24 @@ any message alarms at all.
 Matching is case-sensitive. The source string must match exactly.
 The message string only has to match part of the event log entry.
 
+---
+
+Actions for repeated messages!
+
+repeat 10 1800 red message master browser
+
+Now we will get a red status if there are 10 or more messages within the
+last 30 minutes with the string "master browser".
+
+repeat 10 1800 red type error
+
+Red status is there are 10 or more messages within the last 30 minutes
+with the type error, regardless of contents.
+
+The repeat directive can be mixed with the old filtering directives,
+and Mr Big will trigger on the first match. This makes the old rules
+equivalent to
+
+repeat 1 100000 action test value
+
+

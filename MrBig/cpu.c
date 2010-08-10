@@ -156,7 +156,8 @@ void cpu(void)
 	int uc = users();
 	int load = 0;
 	int pc = pscount();
-	MEMORYSTATUS stat;
+	//MEMORYSTATUS stat;
+	MEMORYSTATUSEX statex;
 	OSVERSIONINFO osvi;
 	DWORD memusage;
 
@@ -175,7 +176,9 @@ void cpu(void)
 	}
 
 	r[0] = '\0';
-	GlobalMemoryStatus(&stat);
+	statex.dwLength = sizeof statex;
+	//GlobalMemoryStatus(&stat);
+	GlobalMemoryStatusEx(&statex);
 	if (um < bootred) {
 		snprintf(r, sizeof r, "&red Machine recently rebooted\n");
 		color = "red";
@@ -194,7 +197,11 @@ void cpu(void)
 	} else if (load >= cpuyellow && !strcmp(color, "green")) {
 		color = "yellow";
 	}
+#if 0
 	memusage = 100-stat.dwAvailPhys/(stat.dwTotalPhys/100);
+#else
+	memusage = statex.dwMemoryLoad;
+#endif
 	if (memusage > memred) {
 		color = "red";
 	} else if (memusage > memyellow && !strcmp(color, "green")) {
@@ -212,15 +219,24 @@ void cpu(void)
 		"Windows version %d.%d\n"
 		"%s %s\n",
 		now, up, uc, pc, load,
-		stat.dwTotalPhys / (1024*1024),
+		(long)(statex.ullTotalPhys / (1024*1024)),
 		(int)memusage,
 		r,
+#if 0
 		WIDTH, (double)stat.dwTotalPhys,
 		WIDTH, (double)stat.dwAvailPhys,
 		WIDTH, (double)stat.dwTotalPageFile,
 		WIDTH, (double)stat.dwAvailPageFile,
 		WIDTH, (double)stat.dwTotalVirtual,
 		WIDTH, (double)stat.dwAvailVirtual,
+#else
+		WIDTH, (double)statex.ullTotalPhys,
+		WIDTH, (double)statex.ullAvailPhys,
+		WIDTH, (double)statex.ullTotalPageFile,
+		WIDTH, (double)statex.ullAvailPageFile,
+		WIDTH, (double)statex.ullTotalVirtual,
+		WIDTH, (double)statex.ullAvailVirtual,
+#endif
 		(int)osvi.dwMajorVersion, (int)osvi.dwMinorVersion,
 		PACKAGE, VERSION);
 	append_limits(b, n);

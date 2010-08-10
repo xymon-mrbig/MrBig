@@ -100,18 +100,21 @@ static void recv_cfg(char *host, int port)
 	FILE *fp;
 
 	if (debug > 1) mrlog("recv_cfg(%s, %d)", host, port);
+	if (debug > 1) mrlog("Opening cfg.cache");
 	fp = fopen("cfg.cache", "w");
 	if (fp == NULL) {
-		mrlog("Can't open cfg.cache for writing");
+		mrlog("In recv_cfg: can't open cfg.cache for writing");
 		return;
 	}
+	if (debug > 1) mrlog("Starting winsock");
 	if (!start_winsock()) {
 		fclose(fp);
+		mrlog("In recv_cfg: can't start winsock");
 		return;
 	}
 	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s == -1) {
-		mrlog("No socket for you!");
+		mrlog("No socket for you! [%d]", WSAGetLastError());
 		goto Exit;
 	}
 	memset(&my_addr, 0, sizeof my_addr);
@@ -119,23 +122,31 @@ static void recv_cfg(char *host, int port)
 	my_addr.sin_port = 0;
 	my_addr.sin_addr.s_addr = inet_addr(bind_addr);
 	if (bind(s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
-		mrlog("In recv_cfg: can't bind local address %s", bind_addr);
+		mrlog("In recv_cfg: can't bind local address %s [%d]",
+			bind_addr, WSAGetLastError());
 		goto Exit;
 	}
 	memset(&in_addr, 0, sizeof in_addr);
 	in_addr.sin_family = AF_INET;
 	in_addr.sin_port = htons(port);
 	in_addr.sin_addr.s_addr = inet_addr(host);
+	if (debug > 1) mrlog("Connecting to minicfg");
 	if (connect(s, (struct sockaddr *)&in_addr, sizeof in_addr) == -1) {
-		mrlog("Can't connect");
+		mrlog("Can't connect [%d]", WSAGetLastError());
 		goto Exit;
 	}
 	while ((n = recv(s, b, sizeof b, 0)) > 0) {
+		if (debug > 1) mrlog("Writing %d bytes to cfg.cache", n);
 		fwrite(b, 1, n, fp);
 	}
 Exit:
+	if (debug > 1) mrlog("Closing cfg.cache");
 	fclose(fp);
-	closesocket(s);
+	if (debug > 1) mrlog("Closing socket");
+	if (closesocket(s) != 0) {
+		mrlog("Error closing socket [%d]", WSAGetLastError());
+	}
+	if (debug > 1) mrlog("recv_cfg done");
 }
 
 void read_cfg(char *cat, char *filename)

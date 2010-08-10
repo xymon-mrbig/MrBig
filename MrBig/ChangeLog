@@ -1,4 +1,18 @@
 
+061212	Several changes in mrbig.c to run better on Longhorn.
+	Released 0.13.4.
+
+061205	In cpu.c: replaced GlobalMemoryStatus with GlobalMemoryStatusEx.
+	Released 0.13.3.
+
+061123	More specific error messages from winsock code. Specifically
+	WSAGetLastError() is included in each mrlog call.
+	Released 0.13.2.
+
+061121	New mrbig.cfg option to set debug level:
+	debug N
+	Released 0.13.1.
+
 061116	Massive rewrite of mrsend et al to implement grace periods
 	for alarms that shouldn't fire until after som time.
 	New configuration option:
