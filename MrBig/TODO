@@ -49,3 +49,17 @@ a proxy; indeed, the reason for the proxy is probably to
 avoid the need for unique addresses. We must therefore use
 separate configuration directories for the proxied clients.
 
+---
+
+A much better idea: complement the minicfg protocol with standard
+http. Then the minicfg application can simply be a cgi script on
+a web server.
+
+Fetch scripts from a central location.
+
+Fetch updates from a central location.
+
+---
+
+Why not include odbc support as well?
+

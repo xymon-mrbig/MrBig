@@ -1,4 +1,13 @@
 
+090121	Allow the service to be installed with another service name:
+	mrbig -iSomeOtherServiceName
+	mrbig -uSomeOtherServiceName
+	This allows a second instance of Mr Big to be installed and used
+	for cluster monitoring.
+	Make the maximum report size configurable:
+	report_size XXX
+	The default size is still 5000 bytes.
+
 090116	msgs.c: Close hTestKey after use.
 	Released 0.19.1.
 

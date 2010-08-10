@@ -54,12 +54,13 @@ extern int memyellow, memred;
 extern int dirsep;
 extern int msgage;
 extern int cpuyellow, cpured;
+extern int report_size;
 extern int debug;
-extern int start_winsock();
-extern void stop_winsock();
+extern int start_winsock(void);
+extern void stop_winsock(void);
 
-extern int install_service(void);
-extern int delete_service(void);
+extern int install_service(char *service_name, char *display_name);
+extern int delete_service(char *service_name);
 extern void check_chunks(char *);
 extern void *big_malloc(char *, size_t);
 extern void *big_realloc(char *, void *, size_t);

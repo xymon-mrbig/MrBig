@@ -1,7 +1,7 @@
 #include "mrbig.h"
 
-#define SERVICE_NAME "MrBig"
-#define DISPLAY_NAME "Mr Big Monitoring Agent"
+//#define SERVICE_NAME "MrBig"
+//#define DISPLAY_NAME "Mr Big Monitoring Agent"
 
 SERVICE_STATUS          ServiceStatus; 
 SERVICE_STATUS_HANDLE   ServiceStatusHandle; 
@@ -12,11 +12,11 @@ DWORD ServiceInitialization (DWORD argc, LPTSTR *argv,
         DWORD *specificError); 
 //VOID SvcDebugOut(LPSTR String, DWORD Status);
 
-void DeleteSampleService(SC_HANDLE schSCManager)
+static void DeleteSampleService(SC_HANDLE schSCManager, char *service_name)
 {
     SC_HANDLE schService;
 
-    schService = OpenService(schSCManager, SERVICE_NAME, SERVICE_ALL_ACCESS);
+    schService = OpenService(schSCManager, service_name, SERVICE_ALL_ACCESS);
     if (schService == NULL) {
         printf("Can't open service (%d)\n", (int)GetLastError());
         return;
@@ -27,7 +27,7 @@ void DeleteSampleService(SC_HANDLE schSCManager)
     CloseServiceHandle(schService);
 }
 
-int delete_service(void)
+int delete_service(char *service_name)
 {
         SC_HANDLE schSCManager;
 
@@ -45,11 +45,11 @@ int delete_service(void)
 	    return 0;
 	}
 
-        DeleteSampleService(schSCManager);
+        DeleteSampleService(schSCManager, service_name);
 	return 1;
 }
 
-BOOL CreateSampleService(SC_HANDLE schSCManager) 
+static BOOL CreateSampleService(SC_HANDLE schSCManager, char *service_name, char *display_name) 
 { 
     TCHAR szPath[MAX_PATH]; 
     SC_HANDLE schService;
@@ -62,8 +62,8 @@ BOOL CreateSampleService(SC_HANDLE schSCManager)
 
     schService = CreateService( 
         schSCManager,              // SCManager database 
-        SERVICE_NAME,              // name of service 
-        DISPLAY_NAME,              // service name to display 
+        service_name,              // name of service 
+        display_name,              // service name to display 
         SERVICE_ALL_ACCESS,        // desired access 
         SERVICE_WIN32_OWN_PROCESS, // service type 
         SERVICE_AUTO_START,      // start type 
@@ -84,7 +84,7 @@ BOOL CreateSampleService(SC_HANDLE schSCManager)
     }
 }
 
-int install_service(void)
+int install_service(char *service_name, char *display_name)
 {
 	SC_HANDLE schSCManager;
 
@@ -100,7 +100,7 @@ int install_service(void)
 	if (NULL == schSCManager) 
 	    printf("OpenSCManager failed (%d)\n", (int)GetLastError());
 
-	if (CreateSampleService(schSCManager)) {
+	if (CreateSampleService(schSCManager, service_name, display_name)) {
 		printf("Success\n");
 	} else {
 		printf("Failure\n");
@@ -112,7 +112,12 @@ int service_main(int argc, char **argv)
 { 
    SERVICE_TABLE_ENTRY   DispatchTable[] = 
    { 
-      { SERVICE_NAME, ServiceStart      }, 
+/* http://msdn.microsoft.com/en-us/library/ms686001(VS.85).aspx
+   If the service is installed with the SERVICE_WIN32_OWN_PROCESS service type,
+   this member is ignored, but cannot be NULL.
+   This member can be an empty string ("").
+*/
+      { /*SERVICE_NAME*/"", ServiceStart      }, 
       { NULL,              NULL          } 
    }; 
 
@@ -142,7 +147,11 @@ void WINAPI ServiceStart (DWORD argc, LPTSTR *argv)
     ServiceStatus.dwWaitHint           = 0; 
  
     ServiceStatusHandle = RegisterServiceCtrlHandler( 
-        SERVICE_NAME, 
+/* http://msdn.microsoft.com/en-us/library/ms685054(VS.85).aspx
+   If the service type is SERVICE_WIN32_OWN_PROCESS, the function does not
+   verify that the specified name is valid, because there is only one
+   registered service in the process.
+        /*SERVICE_NAME*/"", 
         ServiceCtrlHandler); 
  
     if (ServiceStatusHandle == (SERVICE_STATUS_HANDLE)0) 

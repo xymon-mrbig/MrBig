@@ -16,6 +16,7 @@ static void pickup_file(char *fn)
 {
 	char full_fn[256], machname[256], testname[256];
 	char b[4900], s[5000], *p;
+//	char *b, *s, *p;
 	FILE *fp;
 	size_t n;
 
@@ -28,6 +29,8 @@ static void pickup_file(char *fn)
 		return;
 	}
 
+//	b = big_malloc("pickup_file", report_size);
+//	s = big_malloc("pickup_file", report_size);
 	full_fn[0] = machname[0] = testname[0] = '\0';
 	snprcat(full_fn, sizeof full_fn, "%s%c%s", pickupdir, dirsep, fn);
 	if (debug) mrlog("Full path '%s'", full_fn);
@@ -52,10 +55,10 @@ static void pickup_file(char *fn)
 	fp = big_fopen("pickup_file", full_fn, "r");
 	if (!fp) {
 		mrlog("Can't pick up file");
-		return;
+		goto Exit;
 	}
 
-	n = fread(b, 1, (sizeof b)-1, fp);
+	n = fread(b, 1, report_size-1, fp);
 	b[n] = '\0';
 	no_return(b);
 
@@ -64,17 +67,21 @@ static void pickup_file(char *fn)
 	if (p == NULL) {
 		mrlog("No status in pickup file");
 		big_fclose("pickup_file", fp);
-		return;
+		goto Exit;
 	}
 
 	*p++ = '\0';
 
 	s[0] = '\0';
-	snprcat(s, sizeof s, "%s\n\n%s\n", now, p);
+	snprcat(s, report_size, "%s\n\n%s\n", now, p);
 
 	mrsend(machname, testname, b, s);
 	big_fclose("pickup_file", fp);
 	remove(full_fn);
+Exit:
+	;
+//	big_free("pickup_file", b);
+//	big_free("pickup_file", s);
 }
 
 static void pickup(void)

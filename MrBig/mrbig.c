@@ -24,6 +24,7 @@ int dirsep;
 int msgage;
 int memsize = MEMSIZE;
 int standalone = 0;
+int report_size = 5000;
 
 /* nosy memory management */
 static int debug_memory = 0;
@@ -480,6 +481,7 @@ static void readcfg(void)
 	memyellow = 100;
 	memred = 100;
 	msgage = 3600;
+	report_size = 5000;
 	memsize = MEMSIZE;
 	pickupdir[0] = '\0';
 	if (logfp) big_fclose("readcfg:logfile", logfp);
@@ -541,6 +543,8 @@ static void readcfg(void)
 				int grace = 0;
 				sscanf(value, "%s %d", test, &grace);
 				insert_grace(test, grace);
+			} else if (!strcmp(key, "report_size")) {
+				report_size = atoi(value);
 			} else if (!strcmp(key, "option")) {
 				insert_option(value);
 			} else if (!strcmp(key, "memsize")) {
@@ -729,7 +733,8 @@ void mrsend(char *machine, char *test, char *color, char *message)
 	struct display *mp;
 	struct sockaddr_in my_addr;
 //	char machine[200], test[100], color[100];
-	char p[5000];
+//	char p[5000];
+	char *p = NULL;
 	int is;
 
 	if (debug > 1) mrlog("mrsend(%s, %s, %s, %s)", machine, test, color, message);
@@ -748,12 +753,13 @@ void mrsend(char *machine, char *test, char *color, char *message)
 	if (!start_winsock()) return;
 
 	/* Prepare the report */
+	p = big_malloc("mrsend()", report_size+1);
 	p[0] = '\0';
 	if (is == 1) {
-		snprcat(p, sizeof p, "status %s.%s green %s",
+		snprcat(p, report_size, "status %s.%s green %s",
 			machine, test, message);
 	} else {
-		snprcat(p, sizeof p, "status %s.%s %s %s",
+		snprcat(p, report_size, "status %s.%s %s %s",
 			machine, test, color, message);
 	}
 
@@ -803,6 +809,7 @@ void mrsend(char *machine, char *test, char *color, char *message)
 			mrlog("Error closing socket [%d]", WSAGetLastError());
 		}
 	}
+	big_free("mrsend()", p);
 }
 
 void mrbig(void)
@@ -906,11 +913,19 @@ int main(int argc, char **argv)
 			debug++;
 		} else if (!strcmp(argv[i], "-m")) {
 			debug_memory = 1;
-		} else if (!strcmp(argv[i], "-i")) {
-			install_service();
+		} else if (!strncmp(argv[i], "-i", 2)) {
+			if (argv[i][2] == '\0') {
+				install_service("MrBig", "Mr Big Monitoring Agent");
+			} else {
+				install_service(argv[i]+2, argv[i]+2);
+			}
 			return 0;
-		} else if (!strcmp(argv[i], "-u")) {
-			delete_service();
+		} else if (!strncmp(argv[i], "-u", 2)) {
+			if (argv[i][2] == '\0') {
+				delete_service("MrBig");
+			} else {
+				delete_service(argv[i]+2);
+			}
 			return 0;
 		} else if (!strcmp(argv[i], "-t")) {
 			standalone = 1;
