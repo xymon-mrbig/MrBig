@@ -113,6 +113,12 @@ void procs(void)
 	plist = NULL;
 
 	if (debug > 1) mrlog("procs(%p, %d)", b, n);
+
+	if (get_option("no_procs", 0)) {
+		mrsend(mrmachine, "procs", "clear", "option no_procs\n");
+		return;
+	}
+
 	cfgfile[0] = '\0';
 	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "procs.cfg");
 	read_cfg("procs", cfgfile);

@@ -89,6 +89,11 @@ void svcs(void)
 
 	if (debug > 1) mrlog("svcs(%p, %d)", b, n);
 
+	if (get_option("no_svcs", 0)) {
+		mrsend(mrmachine, "svcs", "clear", "option no_svcs\n");
+		return;
+	}
+
 	cfgfile[0] = '\0';
 	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "services.cfg");
 	read_cfg("svcs", cfgfile);

@@ -37,7 +37,7 @@ struct event {
 	char *message;
 	struct event *next;
 };
-extern struct event *read_log(char *log, int maxage);
+extern struct event *read_log(char *log, int maxage, int fast);
 extern void free_log(struct event *e);
 extern void print_log(struct event *e);
 
@@ -68,6 +68,7 @@ extern char *big_strdup(char *, char *);
 extern FILE *big_fopen(char *, char *, char *);
 extern int big_fclose(char *, FILE *);
 extern int snprcat(char *str, size_t size, const char *fmt, ...);
+extern char *get_option(char *name, int partial);
 extern void no_return(char *);
 extern void mrsend(char *machine, char *test, char *color, char *message);
 extern void mrlog(char *fmt, ...);

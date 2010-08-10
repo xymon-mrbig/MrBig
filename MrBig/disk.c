@@ -96,13 +96,21 @@ void disk(void)
 	double yellow, red;
 	char d[10], q[5000], r[5000], *color = "green";
 	char cfgfile[1024], drive[10];
-	DWORD drives = GetLogicalDrives();
+	DWORD drives;
 	unsigned int dtype;
 	double pct;
 	unsigned long long total_bytes, free_bytes;
 	ULARGE_INTEGER fa, tb, fb;
 
 	if (debug > 1) mrlog("disk(%p, %d)", b, n);
+
+	if (get_option("no_disk", 0)) {
+		mrsend(mrmachine, "disk", "clear", "option no_disk\n");
+		return;
+	}
+
+	drives = GetLogicalDrives();
+
 	cfgfile[0] = '\0';
 	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "disk.cfg");
 	read_cfg("disk", cfgfile);

@@ -96,7 +96,7 @@ static char *match_rules(struct event *e, char *log)
 	return NULL;
 }
 
-static void read_msgcfg(/*char *p*/)
+static void read_msgcfg(void)
 {
 	char b[1000], action[100], test[100], value[1000];
 	int i, n;
@@ -144,15 +144,6 @@ static void free_cfg(void)
 	for (i = 0; i < nrules; i++) big_free("msgs.c/free_cfg", rules[i].value);
 }
 
-/* msgs
-
-red Mon Jul 05 23:38:48 VS 2004 [ntserver]
-
-App: E 'Mon Jul 05 23:33:53 2004': LicenseService - " Det finns inga fler licenser för produkten Windows
-NT Server. Se Administrationsverktyg, Licenshanteraren för mer information om vilka användare som saknar
-licens och hur många licenser som bör köpas.  "
-*/
-
 #define MAX_KEY_LENGTH 255
 #define MAX_VALUE_NAME 16383
 
@@ -161,9 +152,12 @@ void msgs(void)
 	char b[5000];
 	int n = sizeof b;
 	char cfgfile[1024];
+	char fastmsgsfile[1024];
+	FILE *fastfp;
+	int fastfile = 0;
+	char *fastmsgs_mode;
 	char *mycolor, *color, p[5000];
-	struct event /* *app, *sys, *sec, */ *e;
-//struct event *ulric_fibbar;
+	struct event *e;
 	struct event *events;
 	int m;
 
@@ -183,15 +177,19 @@ void msgs(void)
 
     	DWORD i, retCode;
 
-//    	TCHAR  achValue[MAX_VALUE_NAME+1];
-//    	DWORD cchValue = MAX_VALUE_NAME;
-
-
 	if (debug > 1) mrlog("msgs(%p, %d)", b, n);
+
+	if (get_option("no_msgs", 0)) {
+		mrsend(mrmachine, "msgs", "clear", "option no_msgs\n");
+		return;
+	}
+
 	cfgfile[0] = '\0';
 	snprcat(cfgfile, sizeof cfgfile, "%s%c%s", cfgdir, dirsep, "msgs.cfg");
 	read_cfg("msgs", cfgfile);
 	read_msgcfg(/*cfgfile*/);
+	fastmsgsfile[0] = '\0';
+	snprcat(fastmsgsfile, sizeof fastmsgsfile, "%s%c%s", cfgdir, dirsep, "fastmsgs.cfg");
 
 	time_t t0 = time(NULL);
 
@@ -199,60 +197,20 @@ void msgs(void)
 	color = "green";
 	p[0] = '\0';
 	m = 0;
-#if 0
-	app = read_log("Application", t0-msgage);
-	for (e = app; e != NULL && m < 4000; e = e->next) {
-		mycolor = match_rules(e);
-		if (mycolor) {
-			sanitize_message(e->message);
-			snprcat(p, sizeof p, "&%s Application - %s - %s%s\n",
-				mycolor, e->source,
-				ctime(&e->gtime), e->message);
-			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
-				color = mycolor;
+
+	fastmsgs_mode = get_option("fastmsgs=", 1);
+	if (fastmsgs_mode == NULL) fastmsgs_mode = "fastmsgs=auto";
+
+	if (!strcmp(fastmsgs_mode+9, "auto")) {
+		fastfp = fopen(fastmsgsfile, "r");
+		if (fastfp) {
+			fclose(fastfp);
+			fastfile = 1;
 		}
+		fastfp = fopen(fastmsgsfile, "w");
+		fprintf(fastfp, "processing messages; fastfile = %d\n", fastfile);
+		fclose(fastfp);
 	}
-	free_log(app);
-	sys = read_log("System", t0-msgage);
-	for (e = sys; e != NULL && m < 4000; e = e->next) {
-		mycolor = match_rules(e);
-		if (mycolor) {
-			sanitize_message(e->message);
-			snprcat(p, sizeof p, "&%s System - %s - %s%s\n",
-				mycolor, e->source,
-				ctime(&e->gtime), e->message);
-			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
-				color = mycolor;
-		}
-	}
-	free_log(sys);
-	sec = read_log("Security", t0-msgage);
-	for (e = sec; e != NULL && m < 4000; e = e->next) {
-		mycolor = match_rules(e);
-		if (mycolor) {
-			sanitize_message(e->message);
-			snprcat(p, sizeof p, "&%s Security - %s - %s%s\n",
-				mycolor, e->source,
-				ctime(&e->gtime), e->message);
-			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
-				color = mycolor;
-		}
-	}
-	free_log(sec);
-	ulric_fibbar = read_log("File Replication Service", t0-msgage);
-	for (e = ulric_fibbar; e != NULL && m < 4000; e = e->next) {
-		mycolor = match_rules(e);
-		if (mycolor) {
-			sanitize_message(e->message);
-			snprcat(p, sizeof p, "&%s File Replication Service - %s - %s%s\n",
-				mycolor, e->source,
-				ctime(&e->gtime), e->message);
-			if (!strcmp(color, "green") || !strcmp(mycolor, "red"))
-				color = mycolor;
-		}
-	}
-	free_log(ulric_fibbar);
-#else
 	if (RegOpenKeyEx(HKEY_LOCAL_MACHINE,
 			TEXT("System\\CurrentControlSet\\Services\\EventLog"),
 			0,
@@ -279,7 +237,8 @@ void msgs(void)
 					NULL, NULL, &ftLastWriteTime);
 			if (retCode == ERROR_SUCCESS) {
 				if (debug) mrlog("Reading log %s", achKey);
-				events = read_log(achKey, t0-msgage);
+				events = read_log(achKey, t0-msgage,
+						!strcmp(fastmsgs_mode+9, "on") || fastfile);
 				for (e = events; e && m < 4000; e = e->next) {
 					mycolor = match_rules(e, achKey);
 					if (mycolor) {
@@ -295,8 +254,14 @@ void msgs(void)
 			}
 		}
 	}
-#endif
-//	memset(b, 0, sizeof b);
+
+	if (fastfile) {
+		fastfp = fopen(fastmsgsfile, "w");
+		fprintf(fastfp, "done processing messages\n");
+		fclose(fastfp);
+	} else if (!strcmp(fastmsgs_mode+9, "auto")) {
+		remove(fastmsgsfile);
+	}
 	b[0] = '\0';
 	snprcat(b, n-1, "%s\n\n%s\n", now, p);
 

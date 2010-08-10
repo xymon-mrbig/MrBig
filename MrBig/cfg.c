@@ -95,26 +95,31 @@ static void chomp(char *p)
 static void recv_cfg(char *host, int port)
 {
 	struct sockaddr_in in_addr, my_addr;
-	int n, s;
+	int n, s, failure;
 	char b[32000];
 	FILE *fp;
 
 	if (debug > 1) mrlog("recv_cfg(%s, %d)", host, port);
 	if (debug > 1) mrlog("Opening cfg.cache");
-	fp = fopen("cfg.cache", "w");
+
+	failure = 0;
+	fp = fopen("cfg.cache-", "w");
 	if (fp == NULL) {
-		mrlog("In recv_cfg: can't open cfg.cache for writing");
+		mrlog("In recv_cfg: can't open cfg.cache- for writing");
 		return;
 	}
 	if (debug > 1) mrlog("Starting winsock");
 	if (!start_winsock()) {
-		fclose(fp);
 		mrlog("In recv_cfg: can't start winsock");
+		fprintf(fp, "In recv_cfg: can't start winsock\n");
+		fclose(fp);
 		return;
 	}
 	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s == -1) {
 		mrlog("No socket for you! [%d]", WSAGetLastError());
+		fprintf(fp, "No socket for you! [%d]\n", WSAGetLastError());
+		failure = 1;
 		goto Exit;
 	}
 	memset(&my_addr, 0, sizeof my_addr);
@@ -124,6 +129,9 @@ static void recv_cfg(char *host, int port)
 	if (bind(s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
 		mrlog("In recv_cfg: can't bind local address %s [%d]",
 			bind_addr, WSAGetLastError());
+		fprintf(fp, "In recv_cfg: can't bind local address %s [%d]\n",
+			bind_addr, WSAGetLastError());
+		failure = 1;
 		goto Exit;
 	}
 	memset(&in_addr, 0, sizeof in_addr);
@@ -132,21 +140,28 @@ static void recv_cfg(char *host, int port)
 	in_addr.sin_addr.s_addr = inet_addr(host);
 	if (debug > 1) mrlog("Connecting to minicfg");
 	if (connect(s, (struct sockaddr *)&in_addr, sizeof in_addr) == -1) {
-		mrlog("Can't connect [%d]", WSAGetLastError());
+		mrlog("Can't connect to %s:%d [%d]", host, port, WSAGetLastError());
+		fprintf(fp, "Can't connect to %s:%d [%d]\n", host, port, WSAGetLastError());
+		failure = 1;
 		goto Exit;
 	}
 	while ((n = recv(s, b, sizeof b, 0)) > 0) {
-		if (debug > 1) mrlog("Writing %d bytes to cfg.cache", n);
+		if (debug > 1) mrlog("Writing %d bytes to cfg.cache-", n);
 		fwrite(b, 1, n, fp);
 	}
 Exit:
-	if (debug > 1) mrlog("Closing cfg.cache");
+	if (debug > 1) mrlog("Closing cfg.cache-");
 	fclose(fp);
 	if (debug > 1) mrlog("Closing socket");
 	if (closesocket(s) != 0) {
 		mrlog("Error closing socket [%d]", WSAGetLastError());
 	}
 	if (debug > 1) mrlog("recv_cfg done");
+	if (failure == 0) {
+		/* on windows, renaming to a name that exists is an error */
+		remove("cfg.cache");
+		rename("cfg.cache-", "cfg.cache");
+	}
 }
 
 void read_cfg(char *cat, char *filename)
@@ -176,6 +191,8 @@ void read_cfg(char *cat, char *filename)
 			if (n == 2 && port != 0) {
 				recv_cfg(host, port);
 				read_cfg(category, "cfg.cache");
+			} else {
+				mrlog("In read_cfg: bogus .config line");
 			}
 		} else if (!strncmp(b, ".include ", 9)) {
 			read_cfg(category, b+9);

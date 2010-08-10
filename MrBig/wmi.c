@@ -81,6 +81,14 @@ void wmi(void)
 	nfields = 0;
 
 	if (debug) mrlog("wmi()");
+
+	if (get_option("no_wmi", 0)) {
+		/* no mrsend with clear status because we don't know
+		   the names of the tests
+		*/
+		return;
+	}
+
 	dhInitialize(TRUE);
 	for (i = 0; get_cfg("wmi", b, sizeof b, i); i++) {
 		if (debug) mrlog("wmi: %s", b);

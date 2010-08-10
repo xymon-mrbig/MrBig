@@ -260,7 +260,7 @@ Exit:
 	return e;
 }
 #else	/* Should work for any version */
-struct event *read_log(char *log, int maxage)
+struct event *read_log(char *log, int maxage, int fast)
 {
 	struct event *e = NULL, *p;
 	DWORD BufSize = 64*1024;	/* works for NT4 and up */
@@ -337,6 +337,8 @@ struct event *read_log(char *log, int maxage)
 		}
 		pBuf = pBuf0;
 		memset(pBuf, 0, BufSize);
+
+		if (fast) break;
 	}
 
 Exit:

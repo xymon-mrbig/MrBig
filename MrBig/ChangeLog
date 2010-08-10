@@ -1,4 +1,21 @@
 
+090114	cfg.c: Use cfg.cache- as temporary file when reading configuration.
+	In case of error, write the error to cfg.cache- as well as the log.
+
+090113	mrbig.c: New directive to set options:
+	option [option_name]
+	This is used to selectively disable tests:
+	option no_cpu|no_disk|no_wmi et al
+	All disabled tests except wmi and ext get clear status.
+
+090112	msgs.c: New setting fastmsgs speeds up message processing by only
+	looking at the last 64k. Three modes:
+	option fastmsgs=on always does does the simplified processing
+	option fastmsgs=off always reads all the messages
+	option fastmsgs=auto (the default) behaves like off unless the file
+	fastmsgs.cfg exists in the configuration directory. The file
+	can be empty.
+
 081127	procs: list total and unique process count.
 	Released 0.18.1.
 

@@ -42,6 +42,11 @@ void memory(void)
 
 	if (debug > 1) mrlog("memory(%p, %d)", b, n);
 
+	if (get_option("no_memory", 0)) {
+		mrsend(mrmachine, "memory", "clear", "option no_memory\n");
+		return;
+	}
+
 	r[0] = '\0';
 	statex.dwLength = sizeof statex;
 	//GlobalMemoryStatus(&stat);

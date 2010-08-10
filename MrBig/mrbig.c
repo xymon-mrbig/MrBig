@@ -383,6 +383,43 @@ struct gracetime {
         struct gracetime *next;
 } *gracetime;
 
+struct option {
+	char *name;
+	struct option *next;
+} *options;
+
+char *get_option(char *n, int partial)
+{
+	struct option *o;
+	int l = strlen(n);
+
+	for (o = options; o; o = o->next) {
+		if ((partial && !strncmp(n, o->name, l))
+			|| !strcmp(n, o->name)) return o->name;
+	}
+	return NULL;
+}
+
+static struct option *insert_option(char *n)
+{
+	struct option *o = big_malloc("insert_option", sizeof *o);
+	o->name = big_strdup("insert_option", n);
+	o->next = options;
+	options = o;
+	return o;
+}
+
+static void free_options(void)
+{
+	struct option *o;
+
+	while ((o = options)) {
+		options = o->next;
+		big_free("free_optionlist", o->name);
+		big_free("free_optionlist", o);
+	}
+}
+
 static void insert_grace(char *test, time_t grace)
 {
         struct gracetime *gt = big_malloc("insert_grace", sizeof *gt);
@@ -431,6 +468,7 @@ static void readcfg(void)
 		big_free("readcfg: display", mp);
 	}
 	free_grace();
+	free_options();
 	mrsleep = 300;
 	mrloop = INT_MAX;
 	bootyellow = 60;
@@ -503,6 +541,8 @@ static void readcfg(void)
 				int grace = 0;
 				sscanf(value, "%s %d", test, &grace);
 				insert_grace(test, grace);
+			} else if (!strcmp(key, "option")) {
+				insert_option(value);
 			} else if (!strcmp(key, "memsize")) {
 				memsize = atoi(value);
 			} else if (!strcmp(key, "set")) {

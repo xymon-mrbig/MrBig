@@ -161,17 +161,27 @@ void cpu(void)
 	char r[1000];
 	char up[100];
 	char *color = "green";
-	long ut = get_uptime();
-	int um = ut/60;
-	int uc = users();
-	int load = 0;
-	int pc = pscount();
-	//MEMORYSTATUS stat;
+	long ut;
+	int um;
+	int uc;
+	int load;
+	int pc;
 	MEMORYSTATUSEX statex;
 	OSVERSIONINFO osvi;
 	DWORD memusage;
 
 	if (debug > 1) mrlog("cpu(%p, %d)", b, n);
+
+	if (get_option("no_cpu", 0)) {
+		mrsend(mrmachine, "cpu", "clear", "option no_cpu\n");
+		return;
+	}
+
+	ut = get_uptime();
+	um = ut/60;
+	uc = users();
+	load = 0;
+	pc = pscount();
 
 	ZeroMemory(&osvi, sizeof osvi);
 	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFO);

@@ -21,6 +21,13 @@ static void pickup_file(char *fn)
 
 	if (debug) mrlog("pickup_file(%s)", fn);
 
+	if (get_option("no_ext", 0)) {
+		/* no mrsend with clear status because we don't
+		   know the names of the tests
+		*/
+		return;
+	}
+
 	full_fn[0] = machname[0] = testname[0] = '\0';
 	snprcat(full_fn, sizeof full_fn, "%s%c%s", pickupdir, dirsep, fn);
 	if (debug) mrlog("Full path '%s'", full_fn);
