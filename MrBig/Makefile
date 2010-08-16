@@ -1,6 +1,6 @@
 
 PACKAGE=MrBig
-VERSION=0.19.3
+VERSION=0.19.99.1
 #CFLAGS=-Wall -O -g -DDEBUG
 CFLAGS=-Wall -O3 -g -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 DOCS=INSTALL EVENTS ChangeLog TODO EXT LARRD logs.cmd testfile.txt
@@ -24,12 +24,12 @@ ARCHIVE=ulric@tiffany.365-24.se:/usr/local/apache/vhosts/extranet.365-24.se/MrBi
 BETAVERSION=`date +%y%m%d%H%M`
 
 all:
-	make -C X86 mrbig.exe
-	make -C X64 mrbig64.exe
+	$(MAKE) -C X86 mrbig.exe
+	$(MAKE) -C X64 mrbig64.exe
 
 mrwmi:
-	make -C X86 mrwmi.exe
-	make -C X64 mrwmi.exe
+	$(MAKE) -C X86 mrwmi.exe
+	$(MAKE) -C X64 mrwmi.exe
 
 mrwmi.exe: $(OBJS) wmi.o disphelper.o
 	$(CC) -o mrwmi.exe $(OBJS) wmi.o disphelper.o -lws2_32 -lpsapi -lole32 -loleaut32 -luuid
@@ -119,6 +119,6 @@ upload: zip dist
 
 beta:
 	rm -f X86/mrbig.exe
-	make all
+	$(MAKE) all
 	scp X86/mrbig.exe $(ARCHIVE)/Beta/mrbig-$(BETAVERSION)-beta.exe
 
