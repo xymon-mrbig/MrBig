@@ -805,7 +805,8 @@ HRESULT ConvertVariantTimeToFileTime(DATE date, FILETIME * pft)
 	if (date < VARIANT_FILE_TIME_DAY0) return E_INVALIDARG;
 	ftScalar = (ULONGLONG) ((date * FILE_TIME_ONE_DAY) + FILE_TIME_VARIANT_DAY0);
 
-	*pft = *((FILETIME *) &ftScalar);
+	pft->dwLowDateTime = (DWORD)ftScalar;
+	pft->dwHighDateTime = (DWORD)(ftScalar >> 32);
 
 	return NOERROR;
 }
@@ -927,11 +928,11 @@ HRESULT ConvertBStrToAnsiStr(BSTR bstrIn, LPSTR * lpszOut)
 static DH_EXCEPTION_OPTIONS g_ExceptionOptions;
 
 static LONG  f_lngTlsInitBegin = -1, f_lngTlsInitEnd = -1;
-static DWORD f_TlsIdxStackCount, f_TlsIdxException;
+static uintptr_t f_TlsIdxStackCount, f_TlsIdxException;
 
 #define SetStackCount(nStackCount)   TlsSetValue(f_TlsIdxStackCount, (LPVOID) (nStackCount))
 #define SetExceptionPtr(pException)  TlsSetValue(f_TlsIdxException, pException);
-#define GetStackCount()       (UINT) TlsGetValue(f_TlsIdxStackCount)
+#define GetStackCount()       (uintptr_t) TlsGetValue(f_TlsIdxStackCount)
 #define GetExceptionPtr()            TlsGetValue(f_TlsIdxException)
 #define CheckTlsInitialized()        if (f_lngTlsInitEnd != 0) InitializeTlsIndexes();
 
@@ -966,7 +967,7 @@ void dhEnter(void)
 HRESULT dhExitEx(HRESULT hr, BOOL bDispatchError, LPCWSTR szMember, LPCWSTR szCompleteMember,
                  EXCEPINFO * pExcepInfo, UINT iArgError, LPCWSTR szFunctionName)
 {
-	UINT nStackCount = GetStackCount();
+	uintptr_t nStackCount = GetStackCount();
 
 	SetStackCount(nStackCount - 1);
 

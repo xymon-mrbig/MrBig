@@ -51,7 +51,7 @@ static BOOL get_module_from_source(char *log,
 	module_name_size = sizeof module_name - 1;
 
 	lResult = RegQueryValueEx(hSourceKey, "EventMessageFile",
-		NULL, NULL, module_name, &module_name_size);
+	    NULL, NULL, (BYTE*)module_name, &module_name_size);
 
 	if (lResult != ERROR_SUCCESS) {
 		if (debug) mrlog("get_module_from_source: can't RegQueryValueEx");
@@ -374,7 +374,7 @@ void print_log(struct event *e)
 		printf("Record Number: %d\n", (int)e->record);
 		printf("Time Generated: %s", ctime(&e->gtime));
 		printf("Time Written: %s", ctime(&e->wtime));
-		printf("Event ID: %d\n", (int)&e->id);
+		printf("Event ID: %lu\n", (DWORD)e->id);
 		printf("Event Type: ");
 		switch(e->type) {
 		case EVENTLOG_SUCCESS:
