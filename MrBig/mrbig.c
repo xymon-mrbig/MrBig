@@ -885,6 +885,17 @@ void mrbig(void)
 	}
 }
 
+void usage(void)
+{
+	fprintf(stderr, "mrbig [-dmiut]\n");
+	fprintf(stderr, "	-d	enable debugging (can appear several times on command line)\n");
+	fprintf(stderr, "	-m	enable memory allocation debugging\n");
+	fprintf(stderr, "	-i	install as service\n");
+	fprintf(stderr, "	-u	uninstall service\n");
+	fprintf(stderr, "	-t	run in standalone mode\n");
+	exit(1);
+}
+
 int main(int argc, char **argv)
 {
 	int i;
@@ -931,7 +942,7 @@ int main(int argc, char **argv)
 			standalone = 1;
 		} else {
 			fprintf(stderr, "Bogus option '%s'\n", argv[i]);
-			return 0;
+			usage();
 		}
 	}
 
