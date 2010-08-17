@@ -150,8 +150,8 @@ void WINAPI ServiceStart (DWORD argc, LPTSTR *argv)
 /* http://msdn.microsoft.com/en-us/library/ms685054(VS.85).aspx
    If the service type is SERVICE_WIN32_OWN_PROCESS, the function does not
    verify that the specified name is valid, because there is only one
-   registered service in the process.
-        /*SERVICE_NAME*/"", 
+   registered service in the process. */
+        "",  // SERVICE_NAME
         ServiceCtrlHandler); 
  
     if (ServiceStatusHandle == (SERVICE_STATUS_HANDLE)0) 
