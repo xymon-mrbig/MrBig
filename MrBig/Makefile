@@ -2,7 +2,7 @@
 PACKAGE=MrBig
 VERSION=0.19.99.1
 #CFLAGS=-Wall -O -g -DDEBUG
-CFLAGS=-Wall -O2 -g -ggdb -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
+CFLAGS=-Wall -O2 -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer -g -ggdb -DPACKAGE=\"$(PACKAGE)\" -DVERSION=\"$(VERSION)\"
 DOCS=INSTALL EVENTS ChangeLog TODO EXT LARRD logs.cmd testfile.txt
 SRCS=cfg.c cpu.c disk.c memory.c msgs.c procs.c svcs.c mrbig.c \
 	service.c readperf.c readlog.c ext_test.c \

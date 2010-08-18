@@ -812,6 +812,74 @@ void mrsend(char *machine, char *test, char *color, char *message)
 	big_free("mrsend()", p);
 }
 
+#ifdef _WIN64
+#define DWORD_REG uint64_t
+#else
+#define DWORD_REG uint32_t
+#endif
+
+static LONG CALLBACK
+VectoredExceptionHandler(PEXCEPTION_POINTERS ExceptionInfo) {
+	EXCEPTION_RECORD* e = ExceptionInfo->ExceptionRecord;
+	CONTEXT* ctx = ExceptionInfo->ContextRecord;
+	DWORD_REG frame;
+	DWORD_REG prevframe;
+	DWORD_REG ret;
+	int i;
+	FILE* f;
+	time_t t;
+
+	f = fopen("c:\\mrbig_crash.txt", "a");
+	if (!f)
+		return EXCEPTION_CONTINUE_SEARCH;
+
+	t = time(NULL);
+	fprintf(f, "MrBig detected an unhandled Exception at %s", ctime(&t));
+	fprintf(f, "ExceptionCode: 0x%08X\n", (unsigned int)e->ExceptionCode);
+	fprintf(f, "ExceptionFlags: 0x%08X\n", (unsigned int)e->ExceptionFlags);
+	fprintf(f, "ExceptionAddress: 0x%p\n", e->ExceptionAddress);
+	fprintf(f, "NumberParameters: 0x%08X\n", (unsigned int)e->NumberParameters);
+	for (i = 0; i < e->NumberParameters; i++) {
+		fprintf(f, "ExceptionInformation[%i]: 0x%08X\n", i, (unsigned int)e->ExceptionInformation[i]);
+	}
+
+	fprintf(f, "CALL STACK:\n");
+	fprintf(f, "crash: 0x%p\n", e->ExceptionAddress);
+
+#ifdef _WIN64
+	frame = ctx->Rbp;
+#else
+	frame = ctx->Ebp;
+#endif
+
+	for (i = 0; i < 32; i++) {
+		fflush(f);
+		if (frame < 0x1000) {
+			fprintf(f, "frame %p looks invalid. stop.\n", (void*)frame);
+			break;
+		}
+		prevframe = *(DWORD_REG*)frame;
+		ret = *(((DWORD_REG*)frame) + 1);
+		fprintf(f, "frame %p (called from %p) (%p, %p, %p, %p)\n", (void*)frame, (void*)ret,
+		      (void*)*(((DWORD_REG*)frame) + 2),
+		      (void*)*(((DWORD_REG*)frame) + 3),
+		      (void*)*(((DWORD_REG*)frame) + 4),
+		      (void*)*(((DWORD_REG*)frame) + 5));
+		frame = prevframe;
+	}
+
+	fprintf(f, "CONTEXT:\n");
+	for (i = 0; i < sizeof(CONTEXT); i += 4) {
+		fprintf(f, " %08X", *(uint32_t*)((uintptr_t)ctx + i));
+		if ((i % 32) == 28)
+			fprintf(f, "\n");
+	}
+	fprintf(f, "\n");
+	fclose(f);
+
+	return EXCEPTION_CONTINUE_SEARCH;
+};
+
 void mrbig(void)
 {
 	char *p;
@@ -819,6 +887,9 @@ void mrbig(void)
 	int sleeptime, i;
 	char hostname[256];
 	DWORD hostsize;
+
+	/* install exception logging/stacktrace handler */
+	AddVectoredExceptionHandler(1, VectoredExceptionHandler);
 
 	if (debug) {
 		mrlog("mrbig()");
