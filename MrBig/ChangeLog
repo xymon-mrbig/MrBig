@@ -1,3 +1,13 @@
+100823  build with mingw-w64-1.0 / gcc-4.5.1 toolchain 
+	import sources to qbranch SVN
+	add usage()
+	ship releases w/ debugging info so gdb, addr2line et. al work
+	fix warnings
+	remove DOS linebreaks
+	fix 64-bit pointer cast issues
+	build with -O2 instead of -O3
+	log crashes to c:\mrbig_crash.txt with time, stacktrace and ctx dump
+	released version 0.20.0
 
 100401	Commented out #include <windows.h> in mrbig.h.
 
