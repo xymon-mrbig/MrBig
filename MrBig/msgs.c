@@ -159,7 +159,6 @@ void msgs(void)
 	char *mycolor, *color, p[5000];
 	struct event *e;
 	struct event *events;
-	int m;
 
 	HKEY hTestKey;
     	TCHAR    achKey[MAX_KEY_LENGTH+1];   // buffer for subkey name
@@ -196,7 +195,6 @@ void msgs(void)
 
 	color = "green";
 	p[0] = '\0';
-	m = 0;
 
 	fastmsgs_mode = get_option("fastmsgs=", 1);
 	if (fastmsgs_mode == NULL) fastmsgs_mode = "fastmsgs=auto";
@@ -239,7 +237,7 @@ void msgs(void)
 				if (debug) mrlog("Reading log %s", achKey);
 				events = read_log(achKey, t0-msgage,
 						!strcmp(fastmsgs_mode+9, "on") || fastfile);
-				for (e = events; e && m < 4000; e = e->next) {
+				for (e = events; e; e = e->next) {
 					mycolor = match_rules(e, achKey);
 					if (mycolor) {
 						sanitize_message(e->message);
