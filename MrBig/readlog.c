@@ -413,9 +413,10 @@ int main(int argc, char **argv)
 	struct event *app, *sys, *sec;
 
 	time_t now = time(NULL);
-	app = read_log("Application", now-maxage);
-	sys = read_log("System", now-maxage);
-	sec = read_log("Security", now-maxage);
+
+	app = read_log("Application", now-maxage, 0);
+	sys = read_log("System", now-maxage, 0);
+	sec = read_log("Security", now-maxage, 0);
 	printf("Application\n\n");
 	print_log(app);
 	printf("\n\nSystem\n\n");
