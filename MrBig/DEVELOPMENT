@@ -1,0 +1,101 @@
+BUILD INSTRUCTIONS
+==================
+
+Current MrBig releases (since 0.20.0) are built on a 64-bit windows host,
+using sh(1), make(1) and zip(1) from the cygwin project. It should be
+possible to cross build from any platform capable of running a mingw toolchain.
+
+The following tools / toolchains are used and need to be in $PATH:
+
+cygwin-1.7.5
+mingw-w32-1.0-bin_i686-mingw_20100702
+mingw-w64-1.0-bin_i686-mingw_20100702
+
+All the neccessary tools can be downloaded free of charge from
+  http://mingw-w64.sourceforge.net/
+and
+  http://www.cygwin.com/
+
+After you've ensured all tools are in $PATH, just cd to MrBig and type "make"
+which will build both the 32-bit and 64-bit versions.
+
+DEBUGGING
+=========
+windows has no native support for core dumps, so GDB is of limited use.
+It can still be useful for running the binary and for disassembly purposes.
+You can get a prebuilt GDB from the mingw-w64 project site.
+For example, x86_64-w64-mingw32-gdb-7.1.90.20100730 is known to work.
+
+To aid crash analysis, MrBig includes (since 0.20.0) a rudimentary exception
+handler that logs a stack trace and context dump to c:\mrbig_crash.txt.
+
+The crash log can look something like this:
+
+MrBig detected an unhandled Exception at Fri Aug 20 04:52:13 2010
+ExceptionCode: 0xC0000005
+ExceptionFlags: 0x00000000
+ExceptionAddress: 0x7C837FEF
+NumberParameters: 0x00000002
+ExceptionInformation[0]: 0x00000000
+ExceptionInformation[1]: 0x020C00F3
+CALL STACK:
+crash: 0x7C837FEF
+frame 00CAAB78 (called from 7C81307E) (00CAAB90, 00CAB25C, 00CAABC4, 00284F4A)
+frame 00CAABB0 (called from 7C80B3AA) (00284F4A, 000004A0, 00CAB25C, 020C00F3)
+frame 00CAB2A4 (called from 77E4F7D9) (00885AA4, 00000000, 7FFDDC00, 00000001)
+frame 00CAB31C (called from 77E4BF54) (00000001, 00284B90, 00880001, 00000100)
+frame 00CAB364 (called from 00407F78) (00000100, 00880001, 00000236, 00000400)
+frame 00CAC3D4 (called from 004039BD) (00CAFC24, 4C6E02F5, 00000001, 00CAFE14)
+frame 00CAFE34 (called from 00406955) (004109F0, 00000400, 004109CB, 00CAFE64)
+frame 00CAFF84 (called from 00407088) (00410D04, 00000000, 80A5A530, 00000001)
+frame 00CAFFA4 (called from 77F65E91) (00000001, 00247784, 00000000, 00CAFFEC)
+frame 00CAFFB8 (called from 77E64829) (00247778, 00000000, 00000000, 00247778)
+frame 00CAFFEC (called from 00000000) (77F65E70, 00247778, 00000000, 000000C8)
+frame 00000000 looks invalid. stop.
+CONTEXT:
+ 0001003F 00000000 00000000 00000000 00000000 00000000 00000000 FFFF027F
+ FFFF0020 FFFFFFFF 004032F8 055C001B 00CAEA20 FFFF0023 00000000 00000000
+ 00000000 00000000 00000000 00000000 DD74BA00 0000400D 28000000 400D94AD
+ 1C63C000 9158BE31 00004005 56000000 400DCFFB 00000000 9725B400 00004017
+ B4000000 400D9725 00000000 00000000 0000003B 00000023 00000023 00000020
+ 00000002 00CA0073 7FFFFFFF 00000007 020C00F3 00CAAB78 7C837FEF 0000001B
+ 00010206 00CAA70C 00000023 0020027F 055C0000 004032F8 0000001B 00CAEA20
+ 00000023 00001F80 0000FFFF 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 DD74BA00 0000400D 00000000 00000000
+ 94AD2800 0000400D 00000000 1C63C000 9158BE31 00004005 00000000 00000000
+ CFFB5600 0000400D 00000000 00000000 9725B400 00004017 00000000 00000000
+ 9725B400 0000400D 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+ 00000000 00000000 00000000
+
+To find the cause of the crash, use the ExceptionAddress and the "called from"
+addresses:
+
+Based on the above example:
+
+C:/mrbig> i686-w64-mingw32-addr2line.exe -p -s -f -e mrbig.exe 0x00407F78 0x004039BD 0x00406955  0x00407088
+
+disp_message at readlog.c:138
+msgs at msgs.c:242
+mrbig at mrbig.c:925
+ServiceStart@8 at service.c:195
+
+So we've found out that the crash happened while executing code at
+readlog.c row 138 (inside a call to the win32 FormatMessage() function).
+
+If addr2line doesn't work (perhaps due to a stripped binary), another
+possibility is to use "objdump -d mrbig.exe" and look for the
+ExceptionAddress in the output.
+
+If you need to find out the contents of registers at the point of crash,
+the layout of the CONTEXT struct can be found in "winnt.h" in the mingw
+distribution.
