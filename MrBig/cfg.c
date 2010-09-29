@@ -98,6 +98,8 @@ static void recv_cfg(char *host, int port)
 	int n, s, failure;
 	char b[32000];
 	FILE *fp;
+	struct linger l_optval;
+	unsigned long nonblock;
 
 	if (debug > 1) mrlog("recv_cfg(%s, %d)", host, port);
 	if (debug > 1) mrlog("Opening cfg.cache");
@@ -111,14 +113,12 @@ static void recv_cfg(char *host, int port)
 	if (debug > 1) mrlog("Starting winsock");
 	if (!start_winsock()) {
 		mrlog("In recv_cfg: can't start winsock");
-		fprintf(fp, "In recv_cfg: can't start winsock\n");
 		big_fclose("recv_cfg", fp);
 		return;
 	}
 	s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	if (s == -1) {
-		mrlog("No socket for you! [%d]", WSAGetLastError());
-		fprintf(fp, "No socket for you! [%d]\n", WSAGetLastError());
+		mrlog("recv_cfg: socket failed: %d", WSAGetLastError());
 		failure = 1;
 		goto Exit;
 	}
@@ -127,36 +127,100 @@ static void recv_cfg(char *host, int port)
 	my_addr.sin_port = 0;
 	my_addr.sin_addr.s_addr = inet_addr(bind_addr);
 	if (bind(s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
-		mrlog("In recv_cfg: can't bind local address %s [%d]",
-			bind_addr, WSAGetLastError());
-		fprintf(fp, "In recv_cfg: can't bind local address %s [%d]\n",
+		mrlog("recv_cfg: bind(%s) failed: [%d]",
 			bind_addr, WSAGetLastError());
 		failure = 1;
 		goto Exit;
 	}
+
+	l_optval.l_onoff = 1;
+	l_optval.l_linger = 5;
+	nonblock = 1;
+	if (ioctlsocket(s, FIONBIO, &nonblock) == SOCKET_ERROR) {
+		mrlog("recv_cfg: ioctlsocket failed: %d", WSAGetLastError());
+		failure = 1;
+		goto Exit;
+	}
+	if (setsockopt(s, SOL_SOCKET, SO_LINGER, (const char*)&l_optval, sizeof(l_optval)) == SOCKET_ERROR) {
+		mrlog("recv_cfg: setsockopt failed: %d", WSAGetLastError());
+		failure = 1;
+		goto Exit;
+	}
+
 	memset(&in_addr, 0, sizeof in_addr);
 	in_addr.sin_family = AF_INET;
 	in_addr.sin_port = htons(port);
 	in_addr.sin_addr.s_addr = inet_addr(host);
 	if (debug > 1) mrlog("Connecting to minicfg");
-	if (connect(s, (struct sockaddr *)&in_addr, sizeof in_addr) == -1) {
-		mrlog("Can't connect to %s:%d [%d]", host, port, WSAGetLastError());
-		fprintf(fp, "Can't connect to %s:%d [%d]\n", host, port, WSAGetLastError());
-		failure = 1;
-		goto Exit;
+	if (connect(s, (struct sockaddr *)&in_addr, sizeof in_addr) == SOCKET_ERROR) {
+		if (WSAGetLastError() != WSAEWOULDBLOCK) {
+			mrlog("recv_cfg: Can't connect to %s:%d [%d]", host, port, WSAGetLastError());
+			failure = 1;
+			goto Exit;
+		}
 	}
-	while ((n = recv(s, b, sizeof b, 0)) > 0) {
-		if (debug > 1) mrlog("Writing %d bytes to cfg.cache-", n);
-		fwrite(b, 1, n, fp);
+
+	time_t start_time = time(NULL);
+	for(;;) {
+		struct timeval timeo;
+		fd_set rfds;
+		fd_set efds;
+
+		if (time(NULL) > start_time + 10 || time(NULL) < start_time) {
+			/* timed out */
+			mrlog("recv_cfg: minicfg timed out");
+			failure = 1;
+			goto Exit;
+		}
+
+		timeo.tv_sec = 1;
+		timeo.tv_usec = 0;
+		FD_ZERO(&rfds);
+		FD_ZERO(&efds);
+
+		select(255 /* ignored on winsock */, &rfds, NULL, &efds, &timeo);
+		n = recv(s, b, sizeof(b), 0);
+		if (n == SOCKET_ERROR) {
+			if (WSAGetLastError() != WSAEWOULDBLOCK && WSAGetLastError() != WSAENOTCONN) {
+				mrlog("recv_cfg: read: %d", WSAGetLastError());
+				failure = 1;
+				goto Exit;
+			}
+		}
+		if (n > 0) {
+			fwrite(b, 1, n, fp);
+			if (debug > 1) mrlog("recv_cfg: Writing %d bytes to cfg.cache-", n);
+		}
+		if (n == 0) {
+			if (debug > 1) mrlog("recv_cfg: success");
+			goto Exit;
+		}
+		if (FD_ISSET(s, &efds)) {
+			mrlog("recv_cfg: exception on socket");
+			failure = 1;
+			goto Exit;
+		}
 	}
+
 Exit:
 	if (debug > 1) mrlog("Closing cfg.cache-");
 	big_fclose("recv_cfg", fp);
 	if (debug > 1) mrlog("Closing socket");
-	if (closesocket(s) != 0) {
-		mrlog("Error closing socket [%d]", WSAGetLastError());
+	shutdown(s, SD_BOTH);
+	Sleep(1000);
+	if (closesocket(s) == SOCKET_ERROR) {
+		if (WSAGetLastError() == WSAEWOULDBLOCK) {
+			Sleep(1000);
+			l_optval.l_onoff = 0;
+			l_optval.l_linger = 0;
+			setsockopt(s, SOL_SOCKET, SO_LINGER, (const char*)&l_optval, sizeof(l_optval));
+			closesocket(s);
+		}
 	}
 	if (debug > 1) mrlog("recv_cfg done");
+	if (failure) {
+		mrlog("recv_cfg: failed to get configuration!");
+	}
 	if (failure == 0) {
 		/* on windows, renaming to a name that exists is an error */
 		remove("cfg.cache");

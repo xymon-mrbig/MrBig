@@ -8,6 +8,9 @@ static char cfgfile[256];
 char mrmachine[256], bind_addr[256] = "0.0.0.0";
 static struct display {
 	struct sockaddr_in in_addr;
+	int s;
+	char* pdata;
+	int remaining;
 	struct display *next;
 } *mrdisplay;
 char cfgdir[256];
@@ -729,9 +732,11 @@ as often as we want without putting any more load on the bbd.
 //void mrsend(char *p)
 void mrsend(char *machine, char *test, char *color, char *message)
 {
-	int m, n, s, x;
 	struct display *mp;
 	struct sockaddr_in my_addr;
+	struct linger l_optval;
+	unsigned long nonblock;
+
 //	char machine[200], test[100], color[100];
 //	char p[5000];
 	char *p = NULL;
@@ -744,6 +749,7 @@ void mrsend(char *machine, char *test, char *color, char *message)
 	if (n != 3) {
 		mrlog("Bogus string in mrsend, process anyway");
 		if (debug) mrlog("%s", p);
+	}
 #endif
 	is = insert_status(machine, test, color);
 	if (is == 0) {
@@ -764,49 +770,130 @@ void mrsend(char *machine, char *test, char *color, char *message)
 	}
 
 	for (mp = mrdisplay; mp; mp = mp->next) {
-		s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (s == -1) {
-			mrlog("No socket for you! [%d]", WSAGetLastError());
-			goto Exit;
+		mp->s = -1;
+	}
+	for (mp = mrdisplay; mp; mp = mp->next) {
+		mp->s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+		if (mp->s == -1) {
+			mrlog("mrsend: socket failed: %d", WSAGetLastError());
+			continue;
 		}
-		memset(&my_addr, 0, sizeof my_addr);
+
+		memset(&my_addr, 0, sizeof(my_addr));
 		my_addr.sin_family = AF_INET;
 		my_addr.sin_port = 0;
 		my_addr.sin_addr.s_addr = inet_addr(bind_addr);
-		if (bind(s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
-			mrlog("In mrsend: can't bind local address %s [%d]",
-				bind_addr, WSAGetLastError());
-			goto Exit;
+		if (bind(mp->s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
+			mrlog("mrsend: bind(%s) failed: [%d]", bind_addr, WSAGetLastError());
+			closesocket(mp->s);
+			mp->s = -1;
+			continue;
+		}
+
+		l_optval.l_onoff = 1;
+		l_optval.l_linger = 5;
+		nonblock = 1;
+		if (ioctlsocket(mp->s, FIONBIO, &nonblock) == SOCKET_ERROR) {
+			mrlog("mrsend: ioctlsocket failed: %d", WSAGetLastError());
+			closesocket(mp->s);
+			mp->s = -1;
+			continue;
+		}
+		if (setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char*)&l_optval, sizeof(l_optval)) == SOCKET_ERROR) {
+			mrlog("mrsend: setsockopt failed: %d", WSAGetLastError());
+			closesocket(mp->s);
+			mp->s = -1;
+			continue;
 		}
 
 		if (debug) mrlog("Using address %s, port %d\n",
 				inet_ntoa(mp->in_addr.sin_addr),
 				ntohs(mp->in_addr.sin_port));
-
-		if (connect(s, (struct sockaddr *)&mp->in_addr, sizeof mp->in_addr)
-				== -1) {
-			mrlog("Can't connect [%d]", WSAGetLastError());
-			goto Exit;
+		if (connect(mp->s, (struct sockaddr *)&mp->in_addr, sizeof(mp->in_addr)) == SOCKET_ERROR) {
+			if (WSAGetLastError() != WSAEWOULDBLOCK) {
+				mrlog("mrsend: connect: %d", WSAGetLastError());
+				l_optval.l_onoff = 0;
+				l_optval.l_linger = 0;
+				setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char*)&l_optval, sizeof(l_optval));
+				closesocket(mp->s);
+				mp->s = -1;
+				continue;
+			}
 		}
 
-		n = strlen(p)-1;	// send the final \0 as well
-		m = 0;
-		while ((m < n) && (x = send(s, p+m, n-m, 0)) > 0) {
-			m += x;
-		}
+		mp->pdata = p;
+		mp->remaining = strlen(p);
+	}
 
-		// Wait for 5 seconds if we have another display
-		if (mp->next) {
-			Sleep(5000);
-		}
+	time_t start_time = time(NULL);
 
-	Exit:
-		if (shutdown(s, SD_SEND) != 0) {
-			mrlog("Error shutting down socket [%d]",
-				WSAGetLastError());
+	for(;;) {
+		struct timeval timeo;
+		fd_set wfds;
+		int len;
+		int tot_remaining;
+		timeo.tv_sec = 1;
+		timeo.tv_usec = 0;
+		FD_ZERO(&wfds);
+		tot_remaining = 0;
+		for (mp = mrdisplay; mp; mp = mp->next) {
+			if (mp->s != -1) {
+				if (mp->remaining > 0) {
+					FD_SET(mp->s, &wfds);
+					tot_remaining += mp->remaining;
+				}
+			}
 		}
-		if (closesocket(s) != 0) {
-			mrlog("Error closing socket [%d]", WSAGetLastError());
+		if (tot_remaining == 0) {
+			/* all data sent to displays */
+			goto cleanup;
+		}
+		if (time(NULL) > start_time + 10 || time(NULL) < start_time) {
+			mrlog("mrsend: send loop timed out");
+			/* this should not take more than 10 seconds. Network problem, so bail out */
+			goto cleanup;
+		}
+		select(255 /* ignored on winsock */, NULL, &wfds, NULL, &timeo);
+		for (mp = mrdisplay; mp; mp = mp->next) {
+			if (mp->s != -1) {
+				if (mp->remaining > 0) {
+					len = send(mp->s, mp->pdata, mp->remaining, 0);
+					if (len == SOCKET_ERROR) {
+						continue;
+					}
+					mp->pdata += len;
+					mp->remaining -= len;
+					if (mp->remaining == 0) {
+						shutdown(mp->s, SD_BOTH);
+					}
+				}
+			}
+		}
+	}
+
+	cleanup:
+
+	/* initiate socket shutdowns */
+	for (mp = mrdisplay; mp; mp = mp->next) {
+		if (mp->s != -1) {
+			shutdown(mp->s, SD_BOTH);
+		}
+	}
+	/* gracefully terminate sockets, finally applying force */
+	for (mp = mrdisplay; mp; mp = mp->next) {
+		int i;
+		if (mp->s != -1) {
+			for (i = 0; i < 10; i++) {
+				if (closesocket(mp->s) == WSAEWOULDBLOCK) {
+					Sleep(1000); /* wait for all data to be sent */
+				}
+			}
+			/* force the socket shut */
+			l_optval.l_onoff = 0;
+			l_optval.l_linger = 0;
+			setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char*)&l_optval, sizeof(l_optval));
+			closesocket(mp->s);
+			mp->s = -1;
 		}
 	}
 	big_free("mrsend()", p);
