@@ -1,3 +1,8 @@
+101008  Restore Windows 2000 support that was broken in 0.20.0 due to
+        lack of AddVectoredExceptionHandler support in kernel32.dll.
+
+101006  Fix support for >2TB disks in disk.c
+
 100929  rewrote mrsend() and recv_cfg() to use non-blocking sockets w/ timeout
 
 100823  build with mingw-w64-1.0 / gcc-4.5.1 toolchain 

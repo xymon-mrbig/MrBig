@@ -99,7 +99,7 @@ void disk(void)
 	DWORD drives;
 	unsigned int dtype;
 	double pct;
-	unsigned long long total_bytes, free_bytes;
+	uint64_t total_bytes, free_bytes;
 	ULARGE_INTEGER fa, tb, fb;
 
 	if (debug > 1) mrlog("disk(%p, %d)", b, n);
@@ -118,8 +118,8 @@ void disk(void)
 
 	r[0] = '\0';
 	q[0] = '\0';
-	snprcat(q, sizeof q, "%-10s %11s %11s %11s %8s %s\n",
-		"Filesystem", "1k-blocks", "Used", "Avail", "Capacity",
+	snprcat(q, sizeof q, "%-11s %9s %9s %9s %9s  %s\n",
+		"Filesystem", "1M-blocks", "Used", "Avail", "Capacity",
 		"Mounted");
 	for (i = 'A'; i <= 'Z'; i++) {
 		if (drives & 1) {
@@ -156,11 +156,11 @@ void disk(void)
 				j = 0;
 				/* Filesystem */
 				snprcat(q, sizeof q,
-					"%-10c %11lu %11lu %11lu %5.1f%%   /FIXED/%c\n",
+					"%-11c % 9" PRIu64 " % 9" PRIu64 " % 9" PRIu64 " % 8.1f%%  /FIXED/%c\n",
 					i,
-					(unsigned long) (total_bytes / 1024),
-					(unsigned long) ((total_bytes - free_bytes) / 1024),
-					(unsigned long) (free_bytes / 1024),
+					(total_bytes / 1024 / 1024),
+					((total_bytes - free_bytes) / 1024 / 1024),
+					(free_bytes / 1024 / 1024),
 					pct, i);
 			}
 		}

@@ -975,8 +975,23 @@ void mrbig(void)
 	char hostname[256];
 	DWORD hostsize;
 
-	/* install exception logging/stacktrace handler */
-	AddVectoredExceptionHandler(1, VectoredExceptionHandler);
+	/*
+	 * install exception logging/stacktrace handler.
+	 * We need to resolve the symbol at run time because windows 2000
+	 * does not have it.
+	 */
+	do {
+		HMODULE dll;
+		PVOID (*ptr) (ULONG First,PVECTORED_EXCEPTION_HANDLER Handler) = NULL;
+		dll = LoadLibraryEx("kernel32.dll", NULL, 0);
+		if (dll == NULL)
+			break;
+		ptr = (typeof(ptr))etProcAddress(dll, "AddVectoredExceptionHandler");
+		if (ptr == NULL)
+			break;
+		ptr(1, VectoredExceptionHandler);
+		mrlog("VectoredExceptionHandler handler has been installed");
+	} while(0);
 
 	if (debug) {
 		mrlog("mrbig()");

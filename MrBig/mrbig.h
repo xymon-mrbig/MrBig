@@ -14,6 +14,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 /* Never sleep for less than 30 seconds */
 #define SLEEP_MIN (10)
