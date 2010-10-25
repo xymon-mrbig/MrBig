@@ -986,7 +986,7 @@ void mrbig(void)
 		dll = LoadLibraryEx("kernel32.dll", NULL, 0);
 		if (dll == NULL)
 			break;
-		ptr = (typeof(ptr))etProcAddress(dll, "AddVectoredExceptionHandler");
+		ptr = (typeof(ptr))GetProcAddress(dll, "AddVectoredExceptionHandler");
 		if (ptr == NULL)
 			break;
 		ptr(1, VectoredExceptionHandler);
