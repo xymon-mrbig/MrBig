@@ -15,8 +15,7 @@ void mrlog(char *p)
 static void pickup_file(char *fn)
 {
 	char full_fn[256], machname[256], testname[256];
-	char b[4900], s[5000], *p;
-//	char *b, *s, *p;
+	char *b, *s, *p;
 	FILE *fp;
 	size_t n;
 
@@ -29,23 +28,19 @@ static void pickup_file(char *fn)
 		return;
 	}
 
-//	b = big_malloc("pickup_file", report_size);
-//	s = big_malloc("pickup_file", report_size);
-	full_fn[0] = machname[0] = testname[0] = '\0';
-	snprcat(full_fn, sizeof full_fn, "%s%c%s", pickupdir, dirsep, fn);
-	if (debug) mrlog("Full path '%s'", full_fn);
+	snprintf(full_fn, sizeof(full_fn), "%s%c%s", pickupdir, dirsep, fn);
 
 	p = strchr(fn, '.');
 	if (p) {
-		strncpy(machname, fn, p-fn);
-		machname[p-fn] = '\0';
-		strncpy(testname, p+1, sizeof testname-1);
+		*p++ = 0;
+		strncpy(machname, fn, sizeof(machname));
+		strncpy(testname, p, sizeof(testname));
 	} else {
-		strncpy(machname, mrmachine, sizeof machname-1);
-		strncpy(testname, fn, sizeof testname-1);
+		strncpy(machname, mrmachine, sizeof(machname));
+		strncpy(testname, fn, sizeof(machname));
 	}
-	machname[sizeof machname-1] = '\0';
-	testname[sizeof testname-1] = '\0';
+	machname[sizeof(machname)-1] = 0;
+	testname[sizeof(testname)-1] = 0;
 	if (debug) {
 		mrlog("pickup_file(%s)", fn);
 		mrlog("Full path '%s'", full_fn);
@@ -58,30 +53,30 @@ static void pickup_file(char *fn)
 		goto Exit;
 	}
 
+	b = big_malloc("pickup_file", report_size);
+	s = big_malloc("pickup_file", report_size);
 	n = fread(b, 1, report_size-1, fp);
-	b[n] = '\0';
+	big_fclose("pickup_file", fp);
+	remove(full_fn);
+	b[n] = 0;
 	no_return(b);
 
 	p = strchr(b, '\n');
 
 	if (p == NULL) {
-		mrlog("No status in pickup file");
-		big_fclose("pickup_file", fp);
+		mrlog("No color in pickup file");
 		goto Exit;
 	}
 
-	*p++ = '\0';
+	*p++ = 0;
 
-	s[0] = '\0';
-	snprcat(s, report_size, "%s\n\n%s\n", now, p);
+	snprintf(s, report_size, "%s\n\n%s\n", now, p);
 
 	mrsend(machname, testname, b, s);
-	big_fclose("pickup_file", fp);
-	remove(full_fn);
+
 Exit:
-	;
-//	big_free("pickup_file", b);
-//	big_free("pickup_file", s);
+	big_free("pickup_file", b);
+	big_free("pickup_file", s);
 }
 
 static void pickup(void)
@@ -105,13 +100,11 @@ static void pickup(void)
 		return;
 	}
 
-	if (!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
-		pickup_file(FindFileData.cFileName);
-
-	while (FindNextFile(hFind, &FindFileData)) {
+	do {
 		if (!(FindFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
 			pickup_file(FindFileData.cFileName);
-	}
+	} while (FindNextFile(hFind, &FindFileData));
+
 	FindClose(hFind);
 }
 

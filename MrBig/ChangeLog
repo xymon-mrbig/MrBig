@@ -1,3 +1,7 @@
+101025  Clean up external script handling and bump default report size
+        limit to 16kB.
+        Release MrBig-0.21.0.
+
 101008  Restore Windows 2000 support that was broken in 0.20.0 due to
         lack of AddVectoredExceptionHandler support in kernel32.dll.
 

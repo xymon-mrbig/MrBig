@@ -27,7 +27,7 @@ int dirsep;
 int msgage;
 int memsize = MEMSIZE;
 int standalone = 0;
-int report_size = 5000;
+int report_size = 16384;
 
 /* nosy memory management */
 static int debug_memory = 0;
@@ -737,8 +737,6 @@ void mrsend(char *machine, char *test, char *color, char *message)
 	struct linger l_optval;
 	unsigned long nonblock;
 
-//	char machine[200], test[100], color[100];
-//	char p[5000];
 	char *p = NULL;
 	int is;
 
