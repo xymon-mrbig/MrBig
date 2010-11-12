@@ -1,3 +1,5 @@
+101112  Remove 5kB hardcoded report size limit in another place.
+
 101025  Clean up external script handling and bump default report size
         limit to 16kB.
         Release MrBig-0.21.0.

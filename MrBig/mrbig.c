@@ -484,7 +484,6 @@ static void readcfg(void)
 	memyellow = 100;
 	memred = 100;
 	msgage = 3600;
-	report_size = 5000;
 	memsize = MEMSIZE;
 	pickupdir[0] = '\0';
 	if (logfp) big_fclose("readcfg:logfile", logfp);
