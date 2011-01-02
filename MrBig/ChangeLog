@@ -1,3 +1,9 @@
+110102  Avoid looping on double faults in exception handler.
+        Revert the disk report to use kilobytes to avoid breaking
+          compatibility with scripts that parse it.
+        Document commandline for installing under a different service name.
+        Release Mrbig-0.22.0.
+ 
 101112  Remove 5kB hardcoded report size limit in another place.
 
 101025  Clean up external script handling and bump default report size

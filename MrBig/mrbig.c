@@ -902,6 +902,7 @@ void mrsend(char *machine, char *test, char *color, char *message)
 #define DWORD_REG uint32_t
 #endif
 
+static volatile int double_fault = 0;
 static LONG CALLBACK
 VectoredExceptionHandler(PEXCEPTION_POINTERS ExceptionInfo) {
 	EXCEPTION_RECORD* e = ExceptionInfo->ExceptionRecord;
@@ -912,6 +913,10 @@ VectoredExceptionHandler(PEXCEPTION_POINTERS ExceptionInfo) {
 	int i;
 	FILE* f;
 	time_t t;
+
+	if (double_fault != 0)
+		return EXCEPTION_CONTINUE_SEARCH;
+	double_fault = 1;
 
 	f = fopen("c:\\mrbig_crash.txt", "a");
 	if (!f)
@@ -1061,7 +1066,9 @@ void usage(void)
 	fprintf(stderr, "	-d	enable debugging (can appear several times on command line)\n");
 	fprintf(stderr, "	-m	enable memory allocation debugging\n");
 	fprintf(stderr, "	-i	install as service\n");
+	fprintf(stderr, "	-iNAME	install as service with alternate name\n");
 	fprintf(stderr, "	-u	uninstall service\n");
+	fprintf(stderr, "	-uNAME	uninstall service with alternate name\n");
 	fprintf(stderr, "	-t	run in standalone mode\n");
 	exit(1);
 }
