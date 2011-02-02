@@ -1,3 +1,6 @@
+110202  Add support for reporting procs and svcs monitoring under
+        alternate host names, configurable per process & service.
+
 110102  Avoid looping on double faults in exception handler.
         Revert the disk report to use kilobytes to avoid breaking
           compatibility with scripts that parse it.

@@ -22,60 +22,54 @@ struct proc {
 struct cfg {
 	char *name;
 	int min, max;
+	char *machine;
 	struct cfg *next;
 } *pcfg;
+
+struct report {
+	char str[5000];
+	char *machine;
+	char *color;
+	struct report *next;
+} *preports;
 
 static void read_proccfg(/*char *p*/)
 {
 	struct cfg *pc;
 	char b[100], name[100];
+	char machine[100];
 	int i, min, max, n;
 
 	pcfg = NULL;
 	for (i = 0; get_cfg("procs", b, sizeof b, i); i++) {
+		machine[0] = 0;
+		name[0] = 0;
 		if (b[0] == '#') continue;
 		if (b[0] == '"') {
-			n = sscanf(b+1, "%[^\"]\" %d %d", name, &min, &max);
+			n = sscanf(b+1, "%[^\"]\" %d %d %s", name, &min, &max, machine);
 		} else {
-			n = sscanf(b, "%s %d %d", name, &min, &max);
+			n = sscanf(b, "%s %d %d %s", name, &min, &max, machine);
 		}
 		if (n < 1) continue;
 		if (n < 2) min = 1;
 		if (n < 3) max = min;
-		pc = big_malloc("procs.c/read_proccfg (node)", sizeof *pc);
-		pc->name = big_strdup("procs.c/read_proccfg (name)", name);
+		pc = big_malloc("read_proccfg (node)", sizeof *pc);
+		pc->name = big_strdup("read_proccfg (name)", name);
 		pc->min = min;
 		pc->max = max;
+		if (strlen(machine) > 0) {
+			char *p;
+			for (p = machine; *p; p++) {
+				if (*p == '.') *p = ',';
+			}
+			pc->machine = big_strdup("procs (machine)", machine);
+		}
+		else
+			pc->machine = big_strdup("procs (machine)", mrmachine);
 		pc->next = pcfg;
 		pcfg = pc;
 	}
 }
-
-#if 0	/* Not necessary, because these lists are freed in procs() */
-static void free_cfg(struct cfg *pcfg)
-{
-	struct cfg *p;
-
-	while (pcfg) {
-		p = pcfg;
-		pcfg = p->next;
-		big_free("procs.c/free_cfg (name)", p->name);
-		big_free("procs.c/free_cfg (node)", p);
-	}
-}
-
-static void free_procnames(struct proc *plist)
-{
-	struct proc *p;
-
-	while (plist) {
-		p = plist;
-		plist = p->next;
-		big_free("free_procnames (name)", p->name);
-		big_free("free_procnames (node)", p);
-	}
-}
-#endif
 
 static struct proc *lookup_procname(char *p)
 {
@@ -105,12 +99,19 @@ void procs(void)
 {
 	char b[5000];
 	int n = sizeof b;
-	char q[5000], *color = "green", *mycolor;
 	char cfgfile[1024];
 	struct proc *pl;
 	struct cfg *pc;
 	int m, running, unique;
 	plist = NULL;
+	struct report *rep;
+	char *mycolor;
+
+	preports = big_malloc("procs (report)", sizeof(struct report));
+	preports->machine = big_strdup("procs (report->machine)", mrmachine);
+	preports->next = NULL;
+	preports->str[0] = 0;
+	preports->color = "green";
 
 	if (debug > 1) mrlog("procs(%p, %d)", b, n);
 
@@ -124,7 +125,7 @@ void procs(void)
 	read_cfg("procs", cfgfile);
 	read_proccfg(/*cfgfile*/);
 	GetProcessList();
-	q[0] = '\0';
+
 	while (pcfg) {
 		pc = pcfg;
 		pcfg = pc->next;
@@ -135,13 +136,31 @@ void procs(void)
 		} else {
 			mycolor = "green";
 		}
-		if (strcmp(mycolor, "green"))
-			color = mycolor;
 //		p[0] = '\0';
-		snprcat(q, sizeof q, "&%s %s - %d running (min %d, max %d)\n",
+
+		for(rep = preports; rep; rep = rep->next) {
+			if (!strcmp(pc->machine, rep->machine)) {
+				break;
+			}
+		}
+
+		if (rep == NULL) {
+			rep = big_malloc("procs (report)", sizeof(struct report));
+			rep->next = preports;
+			rep->machine = big_strdup("procs (report->machine)", pc->machine);
+			rep->str[0] = 0;
+			rep->color = "green";
+			preports = rep;
+		}
+		if (strcmp(mycolor, "green")) {
+			// if any process is non-green, report goes red
+			rep->color = "red";
+		}
+		snprcat(rep->str, sizeof rep->str, "&%s %s - %d running (min %d, max %d)\n",
 			mycolor, pc->name, m, pc->min, pc->max);
 //		strlcat(q, p, sizeof q);
 		big_free("procs (pc->name)", pc->name);
+		big_free("procs (pc->machine)", pc->machine);
 		big_free("procs (pc)", pc);
 	}
 	running = 0;
@@ -157,10 +176,20 @@ void procs(void)
 		big_free("procs (pl->name)", pl->name);
 		big_free("procs (pl)", pl);
 	}
-	b[0] = '\0';
-	snprcat(b, n, "%s\n\n%s\nTotal %d processes running (%d unique)\n",
-		now, q, running, unique);
-	mrsend(mrmachine, "procs", color, b);
+
+	rep = preports;
+	while (rep) {
+		struct report* prev;
+		b[0] = '\0';
+		snprcat(b, n, "%s\n\n%s\nTotal %d processes running (%d unique)\n",
+			now, rep->str, running, unique);
+		mrsend(rep->machine, "procs", rep->color, b);
+		prev = rep;
+		rep = rep->next;
+		big_free("procs (report->machine)", prev->machine);
+		big_free("procs (report)", prev);
+	}
+
 }
 
 
