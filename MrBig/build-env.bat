@@ -1,1 +1,1 @@
-c:\cygwin\bin\bash.exe build-env.sh
+d:\cygwin64\bin\bash.exe build-env.sh
