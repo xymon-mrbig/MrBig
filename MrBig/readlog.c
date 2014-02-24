@@ -52,8 +52,36 @@ static BOOL get_module_from_source(char *log,
 
 	lResult = RegQueryValueEx(hSourceKey, "EventMessageFile",
 	    NULL, NULL, (BYTE*)module_name, &module_name_size);
-
-	if (lResult != ERROR_SUCCESS) {
+		
+	if (lResult == ERROR_FILE_NOT_FOUND) {
+		// Reg key doesn't exist, let's try the other way!
+		char guid[1024];
+		DWORD guid_size;
+		memset(guid, 0, sizeof guid);
+		if (debug) mrlog("get_module_from_source: ERROR_FILE_NOT_FOUND. Looking for DLL another way.");
+		if (debug) mrlog("Looking for ProviderGuid");
+		lResult = RegQueryValueEx(hSourceKey, "ProviderGuid", NULL, NULL, (BYTE*)guid, &guid_size);
+		if (lResult != ERROR_SUCCESS) {
+			if (debug) mrlog("get_module_from_source: Alternate method failed. Giving up.");
+			goto Exit;
+		}
+		if (debug) mrlog("ProviderGuid: %s", guid);
+		HKEY hPublisherKey = NULL;
+		char publisherKey[1024];
+		snprcat(publisherKey, sizeof publisherKey, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\%s", guid);
+		if (debug) mrlog("PublisherKey: %s", publisherKey);
+		lResult = RegOpenKeyEx(HKEY_LOCAL_MACHINE, publisherKey, 0, KEY_READ, &hPublisherKey);
+		if (lResult != ERROR_SUCCESS) {
+			if (debug) mrlog("get_module_from_source: Guid missing from registry. Giving up.");
+			goto Exit;
+		}
+		lResult = RegQueryValueEx(hPublisherKey, "MessageFilename", NULL, NULL, (BYTE*)module_name, &module_name_size);
+		if (lResult != ERROR_SUCCESS) {
+			if (debug) mrlog("get_module_from_source: RegQueryvValueEx failed on alternate method key.");
+			goto Exit;
+		}
+	}
+	else if (lResult != ERROR_SUCCESS) {
 		if (debug) mrlog("get_module_from_source: can't RegQueryValueEx");
 		goto Exit;
 	}
@@ -81,6 +109,7 @@ static BOOL disp_message(char *log, char *source_name, char *entry_name,
 	HANDLE hSourceModule = NULL;
 	char source_module_name[1000];
 	char *pMessage = NULL;
+	source_module_name[0] = '\0';
 
 	if (debug) {
 		mrlog("About to call get_module_from_source(%s, %s, %s, %p)",
@@ -104,9 +133,13 @@ static BOOL disp_message(char *log, char *source_name, char *entry_name,
 	   fail and no messages can be formatted. This ugly hack removes all
 	   but the first dll so at least that one is loaded.
 	*/
+
 	if (1) {
 		char *p = strchr(source_module_name, ';');
 		if (p) {
+			if (debug) {
+				mrlog("source_module_name (before cutting) = '%s'", source_module_name);
+			}
 			*p = '\0';
 		}
 	}
