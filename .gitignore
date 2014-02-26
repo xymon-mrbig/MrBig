@@ -1,0 +1,11 @@
+# Object files
+*.o
+
+# Executables
+*.exe
+
+# Compressed archives.
+*.rar
+*.zip
+*.tar.gz
+*.tar.bz2
