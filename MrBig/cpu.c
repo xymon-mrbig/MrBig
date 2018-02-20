@@ -150,8 +150,6 @@ static void append_limits(char *a, size_t n)
 	snprcat(a, n, "Red uptime: %d minutes\n", bootred);
 	snprcat(a, n, "Yellow CPU: %d%%\n", cpuyellow);
 	snprcat(a, n, "Red CPU: %d%%\n", cpured);
-	snprcat(a, n, "Yellow RAM: %d%%\n", memyellow);
-	snprcat(a, n, "Red RAM: %d%%\n", memred);
 }
 
 void cpu(void)
@@ -224,11 +222,6 @@ void cpu(void)
 #else
 	memusage = statex.dwMemoryLoad;
 #endif
-	if (memusage > memred) {
-		color = "red";
-	} else if (memusage > memyellow && !strcmp(color, "green")) {
-		color = "yellow";
-	}
 	b[0] = '\0';
 	snprcat(b, n,
 		"%s up: %s, %d users, %d procs, load=%d%%, PhysicalMem: %ldMB (%d%%)\n%s\n"
@@ -265,4 +258,3 @@ void cpu(void)
 	append_limits(b, n);
 	mrsend(mrmachine, "cpu", color, b);
 }
-

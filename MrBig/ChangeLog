@@ -1,3 +1,7 @@
+170615  Separated cpu and memory monitoring. Now cpu will not alert together
+        with memory.
+        Released MrBig-0.25.0.
+
 110202  Add support for reporting procs and svcs monitoring under
         alternate host names, configurable per process & service.
 
