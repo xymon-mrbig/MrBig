@@ -1,0 +1,94 @@
+
+Mr Big Monitoring Agent
+-----------------------
+
+Read this file in Wordpad if the linewrapping looks strange.
+
+
+Installation
+------------
+Unzip the archive in a suitable directory, e.g:
+
+md C:\MrBig
+cd C:\MrBig
+unzip \path\to\archive.zip
+
+To install and start the service, run the commands:
+
+mrbig -i
+net start MrBig
+
+By default the service is started automatically during system startup.
+This can be changed using the Services panel in Windows.
+
+
+Stop the service before uninstalling, like this:
+
+net stop MrBig
+mrbig -u
+
+
+Configuration
+-------------
+The archive comes with sample configuration files. You'll want
+to at least create the main configuration file, mrbig.cfg. The
+"machine" and "display" parameters have the most stupid defaults
+and are thus the most important to change.
+
+A suitable mrbig.cfg for a server might look like this:
+
+8<---
+machine myserver.qbranch.se
+port 1984
+display 10.0.4.5
+sleep 300
+8<---
+
+Use the lines between the scissors.
+
+It is not necessary to restart the service after changing the
+configuration.
+
+There can be more than one display.
+
+Rather than placing configuration directives in several files,
+all configuration can be stored in mrbig.cfg. Headers in
+[square brackets] are used to separate the targets. MrBig
+understands these headers:
+
+[mrbig]
+
+The [mrbig] header is used for global settings. Any settings
+that appear before the first header are treated as global.
+
+[disk]
+
+[msgs]
+
+[ext]
+
+[svcs]
+
+[procs]
+
+Configuration can also be split into several files by using the
+.include directive, like this:
+
+.include C:\MrBig\myconfig.txt
+
+
+Configuration daemon
+--------------------
+An optional configuration daemon allows several clients to
+be administered from a single place. If the daemon is running
+on host 10.0.4.5, port 1985, the clients only need a single
+line in mrbig.cfg:
+
+.config 10.0.4.5 1985
+
+The downloaded configuration is cached so that the client
+can continue running even if the configuration daemon
+is unavailable. The name of the cache file is
+C:\windows\system32\cfg.cache.
+
+

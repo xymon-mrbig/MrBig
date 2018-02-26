@@ -1,0 +1,65 @@
+
+cpu: measure most active processes
+
+---
+
+procs: add severity level (color) to the config format
+
+---
+
+Use printError from procs.c more.
+
+---
+
+Add another meta directive: .quote
+
+.quote Rest of string
+
+This adds "Rest of string" to the configuration. The purpose is
+to allow e.g. .include directives in the minicfg configuration
+as well as locally. That would be:
+
+.quote .include C:\my\local\file.cfg
+
+---
+
+Invent a proxy protocol that allows remote clients to get
+their configuration from minicfg.
+
+Idea: the client connects to the proxy. The proxy connects
+to minicfg. Minicfg looks up the proxy's IP address and opens
+its configuration file. If the first line is ".proxy filename",
+we know that it is a proxy. Minicfg reads the real client's IP
+address from the socket and proceeds to read the file from the
+.proxy directive. The file contains a simple access list,
+governing access to the client configurations the proxy is
+allowed to fetch. The access list format is similar to the
+ones in IOS, but with an address mask instead of a wildcard
+mask:
+
+permit 10.0.7.0 255.255.255.0
+deny 10.0.0.0 255.0.0.0
+permit 192.168.1.0 255.255.255.0
+
+At the end is an implicit deny.
+
+However, this does not work. There is no guarantee that the
+clients IP addresses are unique if they are sitting behind
+a proxy; indeed, the reason for the proxy is probably to
+avoid the need for unique addresses. We must therefore use
+separate configuration directories for the proxied clients.
+
+---
+
+A much better idea: complement the minicfg protocol with standard
+http. Then the minicfg application can simply be a cgi script on
+a web server.
+
+Fetch scripts from a central location.
+
+Fetch updates from a central location.
+
+---
+
+Why not include odbc support as well?
+
