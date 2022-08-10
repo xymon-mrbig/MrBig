@@ -146,12 +146,13 @@ void disk(void)
 						"&red %s (%.1f%%) has reached the PANIC level (%.1f%%)\n",
 						d, pct, red);
 					color = "red";
-				} else if (!strcmp(color, "green")
-					 && pct >= yellow) {
+				} else if (pct >= yellow) {
 					snprcat(r, sizeof r,
 						"&yellow %s (%.1f%%) has reached the WARNING level (%.1f%%)\n",
 						d, pct, yellow);
-					color = "yellow";
+					if (!strcmp(color, "green")) {
+						color = "yellow";
+					}
 				}
 				j = 0;
 				/* Filesystem */
