@@ -14,7 +14,7 @@ struct cfg {
 	char *name;
 	double yellow, red;
 	struct cfg *next;
-} *pcfg;
+} *pcfg_disk;
 
 static void read_diskcfg(/*char *p*/)
 {
@@ -23,7 +23,7 @@ static void read_diskcfg(/*char *p*/)
 	int n, i;
 	double y, r;
 
-	pcfg = NULL;
+	pcfg_disk = NULL;
 	for (i = 0; get_cfg("disk", b, sizeof b, i); i++) {
 		if (b[0] == '#') continue;
 		n = sscanf(b, "%s %lf %lf", name, &y, &r);
@@ -32,8 +32,8 @@ static void read_diskcfg(/*char *p*/)
 		pc->name = big_strdup("read_diskcfg (name)", name);
 		pc->yellow = y;
 		pc->red = r;
-		pc->next = pcfg;
-		pcfg = pc;
+		pc->next = pcfg_disk;
+		pcfg_disk = pc;
 	}
 }
 
@@ -41,9 +41,9 @@ static void free_cfg(void)
 {
 	struct cfg *dl;
 
-	while (pcfg) {
-		dl = pcfg;
-		pcfg = dl->next;
+	while (pcfg_disk) {
+		dl = pcfg_disk;
+		pcfg_disk = dl->next;
 		big_free("free_cfg (name)", dl->name);
 		big_free("free_cfg (node)", dl);
 	}
@@ -53,7 +53,7 @@ static void lookup_limits(char *drive, double *yellow, double *red)
 {
 	struct cfg *pc;
 
-	for (pc = pcfg; pc; pc = pc->next) {
+	for (pc = pcfg_disk; pc; pc = pc->next) {
 		if (!strcasecmp(pc->name, drive)) {
 			*yellow = pc->yellow;
 			*red = pc->red;
@@ -71,7 +71,7 @@ static void append_limits(char *a, size_t n)
 #if 0	/* this upsets Hobbit's rrd handler module do_disk.c */
 	snprcat(a, n, "\n<b>Limits:</b>\n<table>\n");
 	snprcat(a, n, "<tr><th>Drive</th><th>Yellow</th><th>Red</th></tr>\n");
-	for (pc = pcfg; pc; pc = pc->next) {
+	for (pc = pcfg_disk; pc; pc = pc->next) {
 		snprcat(a, n, "<tr><td>%s</td><td>%.1f%%</td><td>%.1f%%</td></tr>\n",
 			pc->name, pc->yellow, pc->red);
 	}
@@ -81,7 +81,7 @@ static void append_limits(char *a, size_t n)
 #else	/* fixed width plain text should be safe */
 	snprcat(a, n, "\nLimits:\n");
 	snprcat(a, n, "%-10s %-10s %-10s\n", "Drive", "Yellow", "Red");
-	for (pc = pcfg; pc; pc = pc->next) {
+	for (pc = pcfg_disk; pc; pc = pc->next) {
 		snprcat(a, n, "%-10s %-10.1f %-10.1f\n", pc->name, pc->yellow, pc->red);
 	}
 	snprcat(a, n, "%-10s %-10.1f %-10.1f\n", "Default", dfyellow, dfred);
