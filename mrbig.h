@@ -1,6 +1,6 @@
 
-/* Designed for Win2k and above */
-#define _WIN32_WINNT 0x0500
+/* Designed for Windows Vista / Windows Server 2008 and above */
+#define _WIN32_WINNT 0x0600
 
 /* All required headers */
 //#include <windows.h>
@@ -15,8 +15,9 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <inttypes.h>
+#include "clientlog/clientlog.h"
 
-/* Never sleep for less than 30 seconds */
+/* Never sleep for less than 10 seconds */
 #define SLEEP_MIN (10)
 
 /* from readperf.c */
@@ -42,7 +43,8 @@ extern struct event *read_log(char *log, int maxage, int fast);
 extern void free_log(struct event *e);
 extern void print_log(struct event *e);
 
-extern char mrmachine[256], bind_addr[256];
+extern char mrmachine[256],
+bind_addr[256];
 //extern char mrdisplay[256];
 extern char cfgdir[256];
 extern char now[1024];

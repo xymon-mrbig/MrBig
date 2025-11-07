@@ -14,7 +14,7 @@ void mrlog(char *p)
 
 static void pickup_file(char *fn)
 {
-	char full_fn[256], machname[256], testname[256];
+	char full_fn[1024], machname[261], testname[261];
 	char *b, *s, *p;
 	FILE *fp;
 	size_t n;
@@ -33,8 +33,8 @@ static void pickup_file(char *fn)
 	p = strchr(fn, '.');
 	if (p) {
 		*p++ = 0;
-		strncpy(machname, fn, sizeof(machname));
-		strncpy(testname, p, sizeof(testname));
+		strncpy(machname, fn, sizeof(machname) - 1);
+		strncpy(testname, p, sizeof(testname) - 1);
 	} else {
 		strncpy(machname, mrmachine, sizeof(machname));
 		strncpy(testname, fn, sizeof(machname));
@@ -50,7 +50,7 @@ static void pickup_file(char *fn)
 	fp = big_fopen("pickup_file", full_fn, "r");
 	if (!fp) {
 		mrlog("Can't pick up file");
-		goto Exit;
+		return;
 	}
 
 	b = big_malloc("pickup_file", report_size);

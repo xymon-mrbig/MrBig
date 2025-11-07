@@ -1,3 +1,9 @@
+251517  Added Clientlog module, which writes a big log of rows,
+        containg information about the Windows machine. Most info
+		modules are recreations of Linux command line utilities.
+        Rewrote readlog.c using Wevt32 API.
+		Released MrBig-0.26.3
+
 170615  Separated cpu and memory monitoring. Now cpu will not alert together
         with memory.
         Released MrBig-0.25.0.

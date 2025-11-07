@@ -28,11 +28,66 @@ struct report {
 	struct report *next;
 } *preports;
 
+struct AllServices {
+	ENUM_SERVICE_STATUS_PROCESS* services;
+	DWORD serviceCount;
+	DWORD bufSize;
+	int err;
+};
+
+struct AllServices EnumerateAllServices(SC_HANDLE sc) {
+	void* buf = NULL;
+	DWORD bufSize = 0;
+	DWORD moreBytesNeeded, serviceCount;
+	int err = 0;
+	struct AllServices result;
+	result.err = 0;
+	result.serviceCount = 0;
+	result.services = NULL;
+	result.bufSize = 0;
+
+	for (;;)
+	{
+		if (EnumServicesStatusEx(
+			sc,
+			SC_ENUM_PROCESS_INFO,
+			SERVICE_WIN32,
+			SERVICE_STATE_ALL,
+			(LPBYTE)buf,
+			bufSize,
+			&moreBytesNeeded,
+			&serviceCount,
+			NULL,
+			NULL))
+		{
+			ENUM_SERVICE_STATUS_PROCESS* services = (ENUM_SERVICE_STATUS_PROCESS*)buf;
+			result.services = services;
+			result.serviceCount = serviceCount;
+			result.bufSize = bufSize;
+			return result;
+		}
+		
+		err = GetLastError();
+		if (ERROR_MORE_DATA == err)
+		{
+			bufSize += moreBytesNeeded;
+			big_free("svcs.c/ERROR_MORE_DATA", buf);
+			buf = big_malloc("svcs.c/EnumerateAllServices", bufSize);
+		}
+		else
+		{
+			big_free("svcs.c/UnhandledError", buf);
+			result.err = err;
+			return result;
+		}
+	}
+}
+
 static void read_svccfg(void)
 {
 	struct svc *pc;
 	char b[256], name[256];
-	int i, status, n;
+	int i, status, n =0;
 	char machine[256];
 
 	scfg = NULL;
@@ -99,11 +154,13 @@ void svcs(void)
 	struct svc *pc, *pl;
 
 	char cfgfile[1024];
-	int i, running = 0;
+	int running = 0;
+	size_t i;
 	char *mycolor;
-	BYTE services[65536];
-	ENUM_SERVICE_STATUS_PROCESS *svc;
-	DWORD needed = 0, nsvcs = 0, resume = 0;
+	/* BYTE services[65536]; */
+	/* ENUM_SERVICE_STATUS_PROCESS *svc; */
+	DWORD nsvcs = 0;
+	DWORD bufSize =0;
 	SC_HANDLE sc;
 	struct report *rep;
 
@@ -136,64 +193,73 @@ void svcs(void)
 		preports->color = "red";
 		snprcat(preports->str, sizeof preports->str, "%s\n",
 			"null sc handle");
-	} else if (EnumServicesStatusEx(sc, SC_ENUM_PROCESS_INFO,
-				    SERVICE_WIN32, SERVICE_STATE_ALL,
-				    services, 65536, &needed,
-				    &nsvcs, &resume, NULL)) {
-		svc = (ENUM_SERVICE_STATUS_PROCESS *)services;
-		for (i = 0; i < nsvcs; i++) {
-			if (cfg_mode & CFG_SERVICE_NAME) {
-				pc = lookup_svcname(svc[i].lpServiceName);
-			} else {
-				pc = lookup_svcname(svc[i].lpDisplayName);
-			}
-			pc->status = svc[i].ServiceStatusProcess.dwCurrentState;
-			if (pc->status == SERVICE_RUNNING) running++;
-		}
-		while (scfg) {
-			pc = scfg;
-			scfg = pc->next;
-			pl = lookup_svcname(pc->name);
-			if (pl->status != pc->status) {
-				mycolor = "red";
-			} else {
-				mycolor = "green";
-			}
+	} 
+	else 
+	{
 
-			for(rep = preports; rep; rep = rep->next) {
-				if (!strcmp(pc->machine, rep->machine)) {
-					break;
+		struct AllServices all = EnumerateAllServices(sc);
+		nsvcs = all.serviceCount;
+		bufSize = all.bufSize;
+
+		if ( all.serviceCount > 0 ) {
+
+			for (i = 0; i < all.serviceCount; i++) {
+				if (cfg_mode & CFG_SERVICE_NAME) {
+					pc = lookup_svcname(all.services[i].lpServiceName);
+				} else {
+					pc = lookup_svcname(all.services[i].lpDisplayName);
 				}
+				pc->status = all.services[i].ServiceStatusProcess.dwCurrentState;
+				if (pc->status == SERVICE_RUNNING) running++;
 			}
-			if (rep == NULL) {
-				rep = big_malloc("svcs (report)", sizeof(struct report));
-				rep->next = preports;
-				rep->machine = big_strdup("svcs (pc->machine)", pc->machine);
-				rep->str[0] = 0;
-				rep->color = "green";
-				preports = rep;
+			big_free("svcs.c/all.services", all.services);
+
+			while (scfg) {
+				pc = scfg;
+				scfg = pc->next;
+				pl = lookup_svcname(pc->name);
+				if (pl->status != pc->status) {
+					mycolor = "red";
+				} else {
+					mycolor = "green";
+				}
+
+				for(rep = preports; rep; rep = rep->next) {
+					if (!strcmp(pc->machine, rep->machine)) {
+						break;
+					}
+				}
+				if (rep == NULL) {
+					rep = big_malloc("svcs (report)", sizeof(struct report));
+					rep->next = preports;
+					rep->machine = big_strdup("svcs (pc->machine)", pc->machine);
+					rep->str[0] = 0;
+					rep->color = "green";
+					preports = rep;
+				}
+
+				snprcat(rep->str, sizeof rep->str,
+					"&%s %s - status %d (expected %d)\n",
+					mycolor, pl->name, pl->status, pc->status);
+				if (strcmp(mycolor, "green"))
+					rep->color = "red";
+
+				big_free("svcs (pc->name)", pc->name);
+				big_free("svcs (pc->machine)", pc->machine);
+				big_free("svcs (pc)", pc);
+			}
+			while (slist) {
+				pl = slist;
+				slist = pl->next;
+				big_free("svcs (pl->name)", pl->name);
+				big_free("svcs (pl)", pl);
 			}
 
-			snprcat(rep->str, sizeof rep->str,
-				"&%s %s - status %d (expected %d)\n",
-				mycolor, pl->name, pl->status, pc->status);
-			if (strcmp(mycolor, "green"))
-				rep->color = "red";
-
-			big_free("svcs (pc->name)", pc->name);
-			big_free("svcs (pc->machine)", pc->machine);
-			big_free("svcs (pc)", pc);
-		}
-		while (slist) {
-			pl = slist;
-			slist = pl->next;
-			big_free("svcs (pl->name)", pl->name);
-			big_free("svcs (pl)", pl);
-		}
-	} else {
-		preports->color = "red";
-		snprcat(preports->str, sizeof(preports->str),
+		} else {
+			preports->color = "red";
+			snprcat(preports->str, sizeof(preports->str),
 			"Can't get service list");
+		}
 	}
 	CloseServiceHandle(sc);
 
@@ -210,12 +276,13 @@ void svcs(void)
 			"%d = Running\n"
 			"%d = Continue pending\n"
 			"%d = Pause pending\n"
-			"%d = Paused\n",
+			"%d = Paused\n\n"
+			"(%d bytes svcslist)\n",
 			now, rep->str, (int)nsvcs, running,
 			0, SERVICE_STOPPED, SERVICE_START_PENDING,
 			SERVICE_STOP_PENDING, SERVICE_RUNNING,
 			SERVICE_CONTINUE_PENDING, SERVICE_PAUSE_PENDING,
-			SERVICE_PAUSED);
+			SERVICE_PAUSED, (int)bufSize);
 		mrsend(rep->machine, "svcs", rep->color, b);
 		prev = rep;
 		rep = rep->next;

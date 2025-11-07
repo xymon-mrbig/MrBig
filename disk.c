@@ -14,7 +14,7 @@ struct cfg {
 	char *name;
 	double yellow, red;
 	struct cfg *next;
-} *pcfg;
+} *pcfg_disk;
 
 static void read_diskcfg(/*char *p*/)
 {
@@ -23,7 +23,7 @@ static void read_diskcfg(/*char *p*/)
 	int n, i;
 	double y, r;
 
-	pcfg = NULL;
+	pcfg_disk = NULL;
 	for (i = 0; get_cfg("disk", b, sizeof b, i); i++) {
 		if (b[0] == '#') continue;
 		n = sscanf(b, "%s %lf %lf", name, &y, &r);
@@ -32,8 +32,8 @@ static void read_diskcfg(/*char *p*/)
 		pc->name = big_strdup("read_diskcfg (name)", name);
 		pc->yellow = y;
 		pc->red = r;
-		pc->next = pcfg;
-		pcfg = pc;
+		pc->next = pcfg_disk;
+		pcfg_disk = pc;
 	}
 }
 
@@ -41,9 +41,9 @@ static void free_cfg(void)
 {
 	struct cfg *dl;
 
-	while (pcfg) {
-		dl = pcfg;
-		pcfg = dl->next;
+	while (pcfg_disk) {
+		dl = pcfg_disk;
+		pcfg_disk = dl->next;
 		big_free("free_cfg (name)", dl->name);
 		big_free("free_cfg (node)", dl);
 	}
@@ -53,7 +53,7 @@ static void lookup_limits(char *drive, double *yellow, double *red)
 {
 	struct cfg *pc;
 
-	for (pc = pcfg; pc; pc = pc->next) {
+	for (pc = pcfg_disk; pc; pc = pc->next) {
 		if (!strcasecmp(pc->name, drive)) {
 			*yellow = pc->yellow;
 			*red = pc->red;
@@ -71,7 +71,7 @@ static void append_limits(char *a, size_t n)
 #if 0	/* this upsets Hobbit's rrd handler module do_disk.c */
 	snprcat(a, n, "\n<b>Limits:</b>\n<table>\n");
 	snprcat(a, n, "<tr><th>Drive</th><th>Yellow</th><th>Red</th></tr>\n");
-	for (pc = pcfg; pc; pc = pc->next) {
+	for (pc = pcfg_disk; pc; pc = pc->next) {
 		snprcat(a, n, "<tr><td>%s</td><td>%.1f%%</td><td>%.1f%%</td></tr>\n",
 			pc->name, pc->yellow, pc->red);
 	}
@@ -81,7 +81,7 @@ static void append_limits(char *a, size_t n)
 #else	/* fixed width plain text should be safe */
 	snprcat(a, n, "\nLimits:\n");
 	snprcat(a, n, "%-10s %-10s %-10s\n", "Drive", "Yellow", "Red");
-	for (pc = pcfg; pc; pc = pc->next) {
+	for (pc = pcfg_disk; pc; pc = pc->next) {
 		snprcat(a, n, "%-10s %-10.1f %-10.1f\n", pc->name, pc->yellow, pc->red);
 	}
 	snprcat(a, n, "%-10s %-10.1f %-10.1f\n", "Default", dfyellow, dfred);
@@ -92,7 +92,7 @@ void disk(void)
 {
 	char b[5000];
 	int n = sizeof b;
-	int i, j, res;
+	int drive_letter, res;
 	double yellow, red;
 	char d[10], q[5000], r[5000], *color = "green";
 	char cfgfile[1024], drive[10];
@@ -121,11 +121,11 @@ void disk(void)
 	snprcat(q, sizeof q, "%-11s %11s %11s %11s %11s  %s\n",
 		"Filesystem", "1k-blocks", "Used", "Avail", "Capacity",
 		"Mounted");
-	for (i = 'A'; i <= 'Z'; i++) {
+	for (drive_letter = 'A'; drive_letter <= 'Z'; drive_letter++) {
 		if (drives & 1) {
 			drive[0] = d[0] = '\0';
-			snprcat(drive, sizeof drive, "%c", i);
-			snprcat(d, sizeof d, "%c:\\", i);
+			snprcat(drive, sizeof drive, "%c", drive_letter);
+			snprcat(d, sizeof d, "%c:\\", drive_letter);
 			dtype = GetDriveType(d);
 			if (debug) mrlog("%s is type %d", d, dtype);
 			if (dtype == DRIVE_FIXED) {
@@ -146,22 +146,23 @@ void disk(void)
 						"&red %s (%.1f%%) has reached the PANIC level (%.1f%%)\n",
 						d, pct, red);
 					color = "red";
-				} else if (!strcmp(color, "green")
-					 && pct >= yellow) {
+				} else if (pct >= yellow) {
 					snprcat(r, sizeof r,
 						"&yellow %s (%.1f%%) has reached the WARNING level (%.1f%%)\n",
 						d, pct, yellow);
-					color = "yellow";
+					if (!strcmp(color, "green")) {
+						color = "yellow";
+					}
 				}
-				j = 0;
+
 				/* Filesystem */
 				snprcat(q, sizeof q,
 					"%-11c % 11" PRIu64 " % 11" PRIu64 " % 11" PRIu64 " % 10.1f%%  /FIXED/%c\n",
-					i,
+					drive_letter,
 					(total_bytes / 1024),
 					((total_bytes - free_bytes) / 1024),
 					(free_bytes / 1024),
-					pct, i);
+					pct, drive_letter);
 			}
 		}
 		drives >>= 1;

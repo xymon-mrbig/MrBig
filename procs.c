@@ -31,7 +31,7 @@ struct report {
 	char *machine;
 	char *color;
 	struct report *next;
-} *preports;
+} *preports_procs;
 
 static void read_proccfg(/*char *p*/)
 {
@@ -107,11 +107,11 @@ void procs(void)
 	struct report *rep;
 	char *mycolor;
 
-	preports = big_malloc("procs (report)", sizeof(struct report));
-	preports->machine = big_strdup("procs (report->machine)", mrmachine);
-	preports->next = NULL;
-	preports->str[0] = 0;
-	preports->color = "green";
+	preports_procs = big_malloc("procs (report)", sizeof(struct report));
+	preports_procs->machine = big_strdup("procs (report->machine)", mrmachine);
+	preports_procs->next = NULL;
+	preports_procs->str[0] = 0;
+	preports_procs->color = "green";
 
 	if (debug > 1) mrlog("procs(%p, %d)", b, n);
 
@@ -138,7 +138,7 @@ void procs(void)
 		}
 //		p[0] = '\0';
 
-		for(rep = preports; rep; rep = rep->next) {
+		for(rep = preports_procs; rep; rep = rep->next) {
 			if (!strcmp(pc->machine, rep->machine)) {
 				break;
 			}
@@ -146,11 +146,11 @@ void procs(void)
 
 		if (rep == NULL) {
 			rep = big_malloc("procs (report)", sizeof(struct report));
-			rep->next = preports;
+			rep->next = preports_procs;
 			rep->machine = big_strdup("procs (report->machine)", pc->machine);
 			rep->str[0] = 0;
 			rep->color = "green";
-			preports = rep;
+			preports_procs = rep;
 		}
 		if (strcmp(mycolor, "green")) {
 			// if any process is non-green, report goes red
@@ -177,7 +177,7 @@ void procs(void)
 		big_free("procs (pl)", pl);
 	}
 
-	rep = preports;
+	rep = preports_procs;
 	while (rep) {
 		struct report* prev;
 		b[0] = '\0';

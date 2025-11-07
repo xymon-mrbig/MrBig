@@ -229,11 +229,15 @@ void msgs(void)
 		        &ftLastWriteTime);       // last write time
 
 		for (i = 0; i < cSubKeys; i++) {
+
 			cbName = MAX_KEY_LENGTH;
-			retCode = RegEnumKeyEx(hTestKey, i,
-					achKey, &cbName, NULL,
-					NULL, NULL, &ftLastWriteTime);
-			if (retCode == ERROR_SUCCESS) {
+            retCode = RegEnumKeyEx(hTestKey, i,
+                                   achKey, &cbName, NULL,
+                                   NULL, NULL, &ftLastWriteTime);
+            if (strcmp(achKey, "Directory Service") == 0) {
+                continue;
+            }
+            if (retCode == ERROR_SUCCESS) {
 				if (debug) mrlog("Reading log %s", achKey);
 				events = read_log(achKey, t0-msgage,
 						!strcmp(fastmsgs_mode+9, "on") || fastfile);

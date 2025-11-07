@@ -105,7 +105,6 @@ static int get_load(int version)
 	struct perfcounter *perfc;
 	int i;
 	int load = 0;
-	double pct;
 
 	if (debug > 1) mrlog("get_load(%d)", version);
 
@@ -128,7 +127,6 @@ static int get_load(int version)
 		proc1 = perfc->value[0];
 	}
 	time1 = time(NULL);
-	pct = proc1-proc0;
 	if (proc0 && time1 > time0) {
 		/* we need two samples! */
 		load = 100-(proc1-proc0)/100000/(time1-time0);

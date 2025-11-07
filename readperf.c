@@ -184,8 +184,8 @@ struct perfcounter *read_perfcounters(DWORD object, DWORD *counters,
 			((BYTE *)object_ptr+object_ptr->DefinitionLength);
 		for (i = 0; i < ncounters; i++) {
 			memset(&(results[0].value[i]),
-				sizeof results[b].value[i],
-				0);
+				0,
+				sizeof results[0].value[i]);
 			memcpy(&(results[0].value[i]),
 				(BYTE *)counter_block_ptr+ci[i].offset,
 				ci[i].size);
@@ -205,8 +205,8 @@ struct perfcounter *read_perfcounters(DWORD object, DWORD *counters,
 		results[b].instance = dup_wide_to_multi(name_ptr);
 		for (i = 0; i < ncounters; i++) {
 			memset(&(results[b].value[i]),
-				sizeof results[b].value[i],
-				0);
+				0,
+				sizeof results[b].value[i]);
 			memcpy(&(results[b].value[i]),
 				(BYTE *)counter_block_ptr+ci[i].offset,
 				ci[i].size);

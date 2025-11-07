@@ -33,7 +33,6 @@ void memory(void)
 {
 	char b[5000];
 	int n = sizeof b;
-	char r[1000];
 	char *color = "green";
 	MEMORYSTATUSEX statex;
 	DWORD memusage;
@@ -47,7 +46,6 @@ void memory(void)
 		return;
 	}
 
-	r[0] = '\0';
 	statex.dwLength = sizeof statex;
 	//GlobalMemoryStatus(&stat);
 	GlobalMemoryStatusEx(&statex);

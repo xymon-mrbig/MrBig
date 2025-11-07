@@ -1,4 +1,5 @@
 #include "mrbig.h"
+#include "clientlog/clientlog.h"
 
 #define MEMSIZE 4
 #define PATTERN_SIZE (sizeof big_pattern)
@@ -241,8 +242,8 @@ void *big_realloc(char *p, void *q, size_t n)
 	a = realloc(q, m);
 
 	if (debug > 2) {
-		mrlog("Reallocating %ld bytes (%p => %p) on behalf of %s",	
-			(long)m, q, a, p);
+		mrlog("Reallocating %ld bytes to new address %p, on behalf of %s",	
+			(long)m, a, p);
 	}
 
 	if (a == NULL) {
@@ -339,7 +340,7 @@ FILE *big_fopen(char *p, char *file, char *mode)
 			file, mode, fp, p);
 	}
 	if (fp == NULL) {
-		mrlog("Can't open");
+		mrlog("Can't open file %s", file);
 	} else {
 		store_file(fp, p);
 	}
@@ -721,179 +722,181 @@ static int insert_status(char *machine, char *test, char *color)
 }
 
 /*
-Format is: "status machine,domain,com.test colour [message]"
-
-We can optimise this by parsing out the test name and the colour
+TODO: We can optimise this by parsing out the test name and the colour
 and only send something if the colour has changed for this test
 *or* the bbsleep time is exceeded. Then we can run the main loop
 as often as we want without putting any more load on the bbd.
 */
-//void mrsend(char *p)
+void send_update(char *p) {
+    struct display *mp;
+    struct sockaddr_in my_addr;
+    struct linger l_optval;
+    unsigned long nonblock;
+
+    if (!start_winsock()) return;
+
+    for (mp = mrdisplay; mp; mp = mp->next) {
+        mp->s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (mp->s == -1) {
+            mrlog("send_update: socket failed: %d", WSAGetLastError());
+            continue;
+        }
+
+        memset(&my_addr, 0, sizeof(my_addr));
+        my_addr.sin_family = AF_INET;
+        my_addr.sin_port = 0;
+        my_addr.sin_addr.s_addr = inet_addr(bind_addr);
+        if (bind(mp->s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
+            mrlog("send_update: bind(%s) failed: [%d]", bind_addr, WSAGetLastError());
+            closesocket(mp->s);
+            mp->s = -1;
+            continue;
+        }
+
+        l_optval.l_onoff = 1;
+        l_optval.l_linger = 5;
+        nonblock = 1;
+        if (ioctlsocket(mp->s, FIONBIO, &nonblock) == SOCKET_ERROR) {
+            mrlog("send_update: ioctlsocket failed: %d", WSAGetLastError());
+            closesocket(mp->s);
+            mp->s = -1;
+            continue;
+        }
+        if (setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char *)&l_optval, sizeof(l_optval)) == SOCKET_ERROR) {
+            mrlog("send_update: setsockopt failed: %d", WSAGetLastError());
+            closesocket(mp->s);
+            mp->s = -1;
+            continue;
+        }
+
+        if (debug) mrlog("Using address %s, port %d\n",
+                         inet_ntoa(mp->in_addr.sin_addr),
+                         ntohs(mp->in_addr.sin_port));
+        if (connect(mp->s, (struct sockaddr *)&mp->in_addr, sizeof(mp->in_addr)) == SOCKET_ERROR) {
+            if (WSAGetLastError() != WSAEWOULDBLOCK) {
+                mrlog("send_update: connect: %d", WSAGetLastError());
+                l_optval.l_onoff = 0;
+                l_optval.l_linger = 0;
+                setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char *)&l_optval, sizeof(l_optval));
+                closesocket(mp->s);
+                mp->s = -1;
+                continue;
+            }
+        }
+
+        mp->pdata = p;
+        mp->remaining = strlen(p);
+    }
+
+    time_t start_time = time(NULL);
+
+    for (;;) {
+        struct timeval timeo;
+        fd_set wfds;
+        int len;
+        int tot_remaining;
+        timeo.tv_sec = 1;
+        timeo.tv_usec = 0;
+        FD_ZERO(&wfds);
+        tot_remaining = 0;
+        for (mp = mrdisplay; mp; mp = mp->next) {
+            if (mp->s != -1) {
+                if (mp->remaining > 0) {
+                    FD_SET(mp->s, &wfds);
+                    tot_remaining += mp->remaining;
+                }
+            }
+        }
+        if (tot_remaining == 0) {
+            /* all data sent to displays */
+            goto cleanup;
+        }
+        if (time(NULL) > start_time + 10 || time(NULL) < start_time) {
+            mrlog("send_update: send loop timed out");
+            /* this should not take more than 10 seconds. Network problem, so bail out */
+            goto cleanup;
+        }
+        select(255 /* ignored on winsock */, NULL, &wfds, NULL, &timeo);
+        for (mp = mrdisplay; mp; mp = mp->next) {
+            if (mp->s != -1) {
+                if (mp->remaining > 0) {
+                    len = send(mp->s, mp->pdata, mp->remaining, 0);
+                    if (len == SOCKET_ERROR) {
+                        continue;
+                    }
+                    mp->pdata += len;
+                    mp->remaining -= len;
+                    if (mp->remaining == 0) {
+                        shutdown(mp->s, SD_BOTH);
+                    }
+                }
+            }
+        }
+    }
+
+cleanup:
+
+    /* initiate socket shutdowns */
+    for (mp = mrdisplay; mp; mp = mp->next) {
+        if (mp->s != -1) {
+            shutdown(mp->s, SD_BOTH);
+        }
+    }
+    /* gracefully terminate sockets, finally applying force */
+    for (mp = mrdisplay; mp; mp = mp->next) {
+        int i;
+        if (mp->s != -1) {
+            for (i = 0; i < 10; i++) {
+                if (closesocket(mp->s) == WSAEWOULDBLOCK) {
+                    Sleep(1000); /* wait for all data to be sent */
+                }
+            }
+            /* force the socket shut */
+            l_optval.l_onoff = 0;
+            l_optval.l_linger = 0;
+            setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char *)&l_optval, sizeof(l_optval));
+            closesocket(mp->s);
+            mp->s = -1;
+        }
+    }
+}
+
+/*	Send a status update. The format is:
+    	status [machine],[domain],[tld].[test] [colour] [message]
+	Color may be one of: "green", "yellow", "red", "clear". */
 void mrsend(char *machine, char *test, char *color, char *message)
 {
-	struct display *mp;
-	struct sockaddr_in my_addr;
-	struct linger l_optval;
-	unsigned long nonblock;
-
 	char *p = NULL;
 	int is;
 
 	if (debug > 1) mrlog("mrsend(%s, %s, %s, %s)", machine, test, color, message);
-#if 0
-	n = sscanf(p, "status %199[^.].%99[^ ] %99s",
-		   machine, test, color);
-	if (n != 3) {
-		mrlog("Bogus string in mrsend, process anyway");
-		if (debug) mrlog("%s", p);
-	}
-#endif
+
 	is = insert_status(machine, test, color);
 	if (is == 0) {
 		if (debug) mrlog("mrsend: no change, nothing to do");
 		return;
 	}
-	if (!start_winsock()) return;
 
 	/* Prepare the report */
 	p = big_malloc("mrsend()", report_size+1);
 	p[0] = '\0';
 	if (is == 1) {
 		snprcat(p, report_size, "status %s.%s green %s",
-			machine, test, message);
+				machine, test, message);
 	} else {
 		snprcat(p, report_size, "status %s.%s %s %s",
-			machine, test, color, message);
+				machine, test, color, message);
 	}
-
-	for (mp = mrdisplay; mp; mp = mp->next) {
-		mp->s = -1;
-	}
-	for (mp = mrdisplay; mp; mp = mp->next) {
-		mp->s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-		if (mp->s == -1) {
-			mrlog("mrsend: socket failed: %d", WSAGetLastError());
-			continue;
-		}
-
-		memset(&my_addr, 0, sizeof(my_addr));
-		my_addr.sin_family = AF_INET;
-		my_addr.sin_port = 0;
-		my_addr.sin_addr.s_addr = inet_addr(bind_addr);
-		if (bind(mp->s, (struct sockaddr *)&my_addr, sizeof my_addr) < 0) {
-			mrlog("mrsend: bind(%s) failed: [%d]", bind_addr, WSAGetLastError());
-			closesocket(mp->s);
-			mp->s = -1;
-			continue;
-		}
-
-		l_optval.l_onoff = 1;
-		l_optval.l_linger = 5;
-		nonblock = 1;
-		if (ioctlsocket(mp->s, FIONBIO, &nonblock) == SOCKET_ERROR) {
-			mrlog("mrsend: ioctlsocket failed: %d", WSAGetLastError());
-			closesocket(mp->s);
-			mp->s = -1;
-			continue;
-		}
-		if (setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char*)&l_optval, sizeof(l_optval)) == SOCKET_ERROR) {
-			mrlog("mrsend: setsockopt failed: %d", WSAGetLastError());
-			closesocket(mp->s);
-			mp->s = -1;
-			continue;
-		}
-
-		if (debug) mrlog("Using address %s, port %d\n",
-				inet_ntoa(mp->in_addr.sin_addr),
-				ntohs(mp->in_addr.sin_port));
-		if (connect(mp->s, (struct sockaddr *)&mp->in_addr, sizeof(mp->in_addr)) == SOCKET_ERROR) {
-			if (WSAGetLastError() != WSAEWOULDBLOCK) {
-				mrlog("mrsend: connect: %d", WSAGetLastError());
-				l_optval.l_onoff = 0;
-				l_optval.l_linger = 0;
-				setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char*)&l_optval, sizeof(l_optval));
-				closesocket(mp->s);
-				mp->s = -1;
-				continue;
-			}
-		}
-
-		mp->pdata = p;
-		mp->remaining = strlen(p);
-	}
-
-	time_t start_time = time(NULL);
-
-	for(;;) {
-		struct timeval timeo;
-		fd_set wfds;
-		int len;
-		int tot_remaining;
-		timeo.tv_sec = 1;
-		timeo.tv_usec = 0;
-		FD_ZERO(&wfds);
-		tot_remaining = 0;
-		for (mp = mrdisplay; mp; mp = mp->next) {
-			if (mp->s != -1) {
-				if (mp->remaining > 0) {
-					FD_SET(mp->s, &wfds);
-					tot_remaining += mp->remaining;
-				}
-			}
-		}
-		if (tot_remaining == 0) {
-			/* all data sent to displays */
-			goto cleanup;
-		}
-		if (time(NULL) > start_time + 10 || time(NULL) < start_time) {
-			mrlog("mrsend: send loop timed out");
-			/* this should not take more than 10 seconds. Network problem, so bail out */
-			goto cleanup;
-		}
-		select(255 /* ignored on winsock */, NULL, &wfds, NULL, &timeo);
-		for (mp = mrdisplay; mp; mp = mp->next) {
-			if (mp->s != -1) {
-				if (mp->remaining > 0) {
-					len = send(mp->s, mp->pdata, mp->remaining, 0);
-					if (len == SOCKET_ERROR) {
-						continue;
-					}
-					mp->pdata += len;
-					mp->remaining -= len;
-					if (mp->remaining == 0) {
-						shutdown(mp->s, SD_BOTH);
-					}
-				}
-			}
-		}
-	}
-
-	cleanup:
-
-	/* initiate socket shutdowns */
-	for (mp = mrdisplay; mp; mp = mp->next) {
-		if (mp->s != -1) {
-			shutdown(mp->s, SD_BOTH);
-		}
-	}
-	/* gracefully terminate sockets, finally applying force */
-	for (mp = mrdisplay; mp; mp = mp->next) {
-		int i;
-		if (mp->s != -1) {
-			for (i = 0; i < 10; i++) {
-				if (closesocket(mp->s) == WSAEWOULDBLOCK) {
-					Sleep(1000); /* wait for all data to be sent */
-				}
-			}
-			/* force the socket shut */
-			l_optval.l_onoff = 0;
-			l_optval.l_linger = 0;
-			setsockopt(mp->s, SOL_SOCKET, SO_LINGER, (const char*)&l_optval, sizeof(l_optval));
-			closesocket(mp->s);
-			mp->s = -1;
-		}
-	}
+    send_update(p);
 	big_free("mrsend()", p);
+}
+
+/*	Send an update for clientlog style messages, which have logic configured serverside. 
+	The format is:
+		client [machine],[domain],[tld].[os] [os] [message] */
+void mrsend_clientlog(char *machine, char *message) {
+    if (debug > 1) mrlog("mrsend_clientlog(%s, ...)", machine);
+    send_update(message);
 }
 
 #ifdef _WIN64
@@ -1015,6 +1018,9 @@ void mrbig(void)
 				hostname[i] = tolower(hostname[i]);
 			snprcat(now, sizeof now, " [%s]", hostname);
 		}
+
+        clientlog(mrmachine, &mrsend_clientlog, debug ? &mrlog : (void (*)(char *,...))NULL);
+        check_chunks("after clientlog test");
 
 		cpu();
 		check_chunks("after cpu test");
